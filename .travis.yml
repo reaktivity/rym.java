@@ -4,8 +4,8 @@ before_install:
 - rm ~/.m2/settings.xml
 jdk:
 - openjdk11
-install: ./mvnw -v
-script: ./mvnw -B -nsu verify jacoco:report
+install: "./mvnw -v"
+script: "./mvnw -B -nsu verify jacoco:report"
 cache:
   directories:
   - "$HOME/.m2"
@@ -14,3 +14,6 @@ branches:
   - "/^release\\/.*$/"
 after_success:
 - bash <(curl -s https://codecov.io/bash)
+notifications:
+  slack:
+    secure: TR4WVVzopEogtf7w1XCIwxzyxepqVfFU7NE98OEx0mP5iu/eDEtFwUEOasjZQTUbqs4kf+qtmdItd4Kr9oqmDtdet3r0yPngdhZGktv5ShgvKIz4MtdPmGC2oDL8w5X9KZv3D+tBzw/IZ+Y1A+I78f7JfheBnUhEqTI/a9Bizgr3vDfDzafVYXz7TVkFvrUHjayKc1Ot2PT28WV2YHkJD5sCvuwOhVHr+POHJTe3Geu3SInt25z59uayPNug2RPglmk9Tg/Qh51bWJ5mTWq+gCrHAlWEnQctt+NmKwjBBUFH+KbWbAk5jjro3lcYQmrj3KEnSH6ooMb9mehnDZSB/OG3Ircigf4Gu0oe21Tve0QNVHJ2gx4+TcL2+tTxodiQavS2cDLhXeRLuOlF9e5rdD3PByjmo8smyxhMZQBcYTRQQP7HZZiGAlkOh7BjeM25W1JgnYUFcqiyKhqRxubVLxQKVpzruZXXg9oGewCiKYt4LfSZq2AT+kTVmzpkpFpt4o1zv0DeojgjAHmCqGzdRkb5TlXQJ52sHo0IlYLK/i95mYtsPvEd3Lwo2CoDl89HBz9JdhvBTikdaa7K9qpzsXJiS+3VXPiM5+tZbSFs0fWj2t11qIBhbD3wCjkQkaZFtAEr5cP/6lY8jQha+E1VjqkxuBoSy3e4m+bzJBKUiGA=
