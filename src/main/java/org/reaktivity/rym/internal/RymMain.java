@@ -26,8 +26,8 @@ public final class RymMain
         parser.parse(args).run();
     }
 
-    // utility class
     private RymMain()
     {
+        // utility class
     }
 }

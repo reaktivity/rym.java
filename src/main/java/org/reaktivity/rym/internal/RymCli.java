@@ -24,8 +24,8 @@ import com.github.rvesse.airline.help.Help;
     commands = { Help.class })
 public final class RymCli
 {
-    // utility class
     private RymCli()
     {
+        // utility class
     }
 }
