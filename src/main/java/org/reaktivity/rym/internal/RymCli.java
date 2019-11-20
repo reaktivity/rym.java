@@ -15,19 +15,17 @@
  */
 package org.reaktivity.rym.internal;
 
-import com.github.rvesse.airline.Cli;
+import com.github.rvesse.airline.annotations.Cli;
+import com.github.rvesse.airline.help.Help;
 
-public final class RymMain
+@Cli(name = "rym",
+    description = "Reaktivity Management Tool",
+    defaultCommand = Help.class,
+    commands = { Help.class })
+public final class RymCli
 {
-    public static void main(
-        String[] args)
-    {
-        Cli<Runnable> parser = new Cli<>(RymCli.class);
-        parser.parse(args).run();
-    }
-
     // utility class
-    private RymMain()
+    private RymCli()
     {
     }
 }
