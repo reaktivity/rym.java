@@ -15,13 +15,15 @@
  */
 package org.reaktivity.rym.internal;
 
+import org.reaktivity.rym.internal.commands.install.Install;
+
 import com.github.rvesse.airline.annotations.Cli;
 import com.github.rvesse.airline.help.Help;
 
 @Cli(name = "rym",
     description = "Reaktivity Management Tool",
     defaultCommand = Help.class,
-    commands = { Help.class })
+    commands = { Help.class, Install.class })
 public final class RymCli
 {
     private RymCli()
