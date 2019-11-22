@@ -91,48 +91,53 @@ public final class Install implements Runnable
         JsonObject depsObj = (JsonObject)deps;
 
         JsonElement repositoriesEl = depsObj.get(DEPS_PROP_REPOSITORIES);
-        if (!repositoriesEl.isJsonArray())
+        if (repositoriesEl != null)
         {
-            // TODO Handle file not found
-            System.err.format("Error: %s is not an array of strings", DEPS_PROP_REPOSITORIES);
-            return false;
-        }
-        JsonArray repositoriesArr = (JsonArray)repositoriesEl;
-        for (int i = 0; i < repositoriesArr.size(); i++)
-        {
-            if (repositoriesArr.get(i).isJsonPrimitive())
+            if (!repositoriesEl.isJsonArray())
             {
-                repositories.add(repositoriesArr.get(i).getAsString());
+                // TODO Handle file not found
+                System.err.format("Error: %s is not an array of strings", DEPS_PROP_REPOSITORIES);
+                return false;
             }
-            else
+            JsonArray repositoriesArr = (JsonArray)repositoriesEl;
+            for (int i = 0; i < repositoriesArr.size(); i++)
             {
-                repositories.add(repositoriesArr.get(i).toString());
+                if (repositoriesArr.get(i).isJsonPrimitive())
+                {
+                    repositories.add(repositoriesArr.get(i).getAsString());
+                }
+                else
+                {
+                    repositories.add(repositoriesArr.get(i).toString());
+                }
             }
         }
 
         JsonElement dependenciesEl = depsObj.get(DEPS_PROP_DEPENDENCIES);
-        if (!dependenciesEl.isJsonObject())
+        if (dependenciesEl != null)
         {
-            // TODO Handle file not found
-            System.err.format("Error: %s is not a JSON object", DEPS_PROP_DEPENDENCIES);
-            return false;
+            if (!dependenciesEl.isJsonObject())
+            {
+                // TODO Handle file not found
+                System.err.format("Error: %s is not a JSON object", DEPS_PROP_DEPENDENCIES);
+                return false;
+            }
+            JsonObject dependenciesObj = (JsonObject)dependenciesEl;
+            dependenciesObj.keySet().forEach(key ->
+            {
+                String artifact = key.indexOf(':') > 0 ? key : String.format("%s:%s", DEFAULT_GROUP_NAME, key);
+                JsonElement versionEl = dependenciesObj.get(key);
+                // TODO Process version here. e.g. Is it a range?
+                if (versionEl.isJsonPrimitive())
+                {
+                    dependencies.put(artifact, versionEl.getAsString());
+                }
+                else
+                {
+                    dependencies.put(artifact, versionEl.toString());
+                }
+            });
         }
-        JsonObject dependenciesObj = (JsonObject)dependenciesEl;
-        dependenciesObj.keySet().forEach(key ->
-        {
-            String artifact = key.indexOf(':') > 0 ? key : String.format("%s:%s", DEFAULT_GROUP_NAME, key);
-            JsonElement versionEl = dependenciesObj.get(key);
-            // TODO Process version here. e.g. Is it a range?
-            if (versionEl.isJsonPrimitive())
-            {
-                dependencies.put(artifact, versionEl.getAsString());
-            }
-            else
-            {
-                dependencies.put(artifact, versionEl.toString());
-            }
-        });
-
         return true;
     }
 
