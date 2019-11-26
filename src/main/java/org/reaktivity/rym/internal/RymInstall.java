@@ -59,7 +59,7 @@ public final class RymInstall implements Runnable
 
     public static final String MAVEN_CENTRAL_REPOSITORY = "https://repo1.maven.org/maven2/";
 
-    // TODO Hardcoding maven repo dir...
+    // TODO Hardcoding maven repo dir... What if user has a custom location?
     // ${user.home} will be populated by Ivy at runtime
     public static final String MAVEN_CACHE = "${user.home}/.m2/repository";
 
@@ -106,7 +106,7 @@ public final class RymInstall implements Runnable
 
         try
         {
-            doTheIvyThing();
+            resolveDependencies();
         }
         catch (ParseException e)
         {
@@ -205,52 +205,69 @@ public final class RymInstall implements Runnable
 
     private File createIvySettingsFile() throws IOException
     {
-        // That's where my ivy-settings.xml is located
-        // File ivySettingsXmlFile = new File(String.format("%s/conf/ivy-settings.xml", ivyBaseDir));
-        // configure ivy to use the settings file
         File ivySettingsFile = File.createTempFile("ivy-settings.xml", null);
         ivySettingsFile.deleteOnExit();
-        // Write to temp file
+
+        StringBuffer contents = new StringBuffer();
+        contents.append("<ivysettings>\n");
+        contents.append("  <settings defaultResolver=\"default\"/>\n");
+        contents.append("  <property name=\"m2-pattern\"\n");
+        contents.append("            value=\"[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]\"\n");
+        contents.append("            override=\"false\" />\n");
+        contents.append("  <caches>\n");
+        contents.append("    <cache name=\"mycache\"\n");
+        contents.append(String.format("           basedir=\"%s\"\n", MAVEN_CACHE));
+        contents.append("           ivyPattern=\"${m2-pattern}\"\n");
+        contents.append("           artifactPattern=\"${m2-pattern}\">\n");
+        contents.append("    </cache>\n");
+        contents.append("  </caches>\n");
+        contents.append("  <resolvers>\n");
+        contents.append("    <chain name=\"default\">\n");
+        contents.append("      <url name=\"blah\">\n");
+        contents.append("        <ivy pattern=\"https://repo1.maven.org/maven2/[module]/[revision]/ivy-[revision].xml\" />\n");
+        contents.append("        <artifact pattern=\"https://repo1.maven.org/maven2/[module]/[revision]/[artifact]-[revision].[ext]\" />");
+        contents.append("      </url>\n");
+//        contents.append("      <ibiblio name=\"central\" m2compatible=\"true\" cache=\"mycache\" />\n");
+        contents.append("    </chain>\n");
+        contents.append("  </resolvers>\n");
+        contents.append("</ivysettings>\n");
+
         BufferedWriter out = new BufferedWriter(new FileWriter(ivySettingsFile));
-        out.write("<ivysettings>");
-        out.write("  <settings defaultResolver=\"central\"/>");
-        out.write("  <caches>");
-        out.write("    <cache name=\"mycache\"");
-        out.write(String.format("           basedir=\"%s\"", MAVEN_CACHE));
-        out.write("           ivyPattern=\"[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).xml\"");
-        out.write("           artifactPattern=\"[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]\">");
-        out.write("    </cache>");
-        out.write("  </caches>");
-        out.write("  <resolvers>");
-        out.write("    <ibiblio name=\"central\" m2compatible=\"true\" cache=\"mycache\" />");
-        out.write("  </resolvers>");
-        out.write("</ivysettings>");
+        out.write(contents.toString());
         out.close();
         return ivySettingsFile;
     }
 
     private File createIvyFile() throws IOException
     {
-        // file containing the list of dependencies (ex: ivy.xml)
-        // File dependencyFile = new File(String.format("%s/samples/test/ivy.xml", ivyBaseDir));
-        // resolve the dependencies - Ivy returns a report of the resolution
         File ivyFile = File.createTempFile("ivy.xml", null);
         ivyFile.deleteOnExit();
-        // Write to temp file
+
+        // TODO What to put for "organization" and "module" values here:
+        StringBuffer contents = new StringBuffer();
+        contents.append("<ivy-module version=\"2.0\">\n");
+        contents.append("  <info organisation=\"reaktivity\" module=\"reaktivity-deps\"/>\n");
+        contents.append("  <dependencies>\n");
+        for (Map.Entry<String, String> entry : dependencies.entrySet())
+        {
+            String[] dependencyComponents = entry.getKey().split(":");
+            contents.append(String.format("    <dependency org=\"%s\" name=\"%s\" rev=\"%s\"/>\n",
+                dependencyComponents[0],
+                dependencyComponents[1],
+                entry.getValue()));
+        }
+        contents.append("    <dependency org=\"commons-lang\" name=\"commons-lang\" rev=\"2.0\"/>\n");
+        contents.append("    <dependency org=\"commons-cli\" name=\"commons-cli\" rev=\"1.2\"/>\n");
+        contents.append("  </dependencies>\n");
+        contents.append("</ivy-module>\n");
+
         BufferedWriter out = new BufferedWriter(new FileWriter(ivyFile));
-        out.write("<ivy-module version=\"2.0\">");
-        // TODO What to put for organization and module values here:
-        out.write("  <info organisation=\"reaktivity\" module=\"reaktivity-deps\"/>");
-        out.write("  <dependencies>");
-        out.write("    <dependency org=\"commons-lang\" name=\"commons-lang\" rev=\"2.0\"/>");
-        out.write("    <dependency org=\"commons-cli\" name=\"commons-cli\" rev=\"1.2\"/>");
-        out.write("  </dependencies>");
-        out.write("</ivy-module>");
+        out.write(contents.toString());
         out.close();
         return ivyFile;
     }
 
-    private void doTheIvyThing() throws ParseException, IOException
+    private void resolveDependencies() throws ParseException, IOException
     {
         IvySettings ivySettings = new IvySettings();
         org.apache.ivy.Ivy ivy = Ivy.newInstance(ivySettings);
@@ -261,7 +278,6 @@ public final class RymInstall implements Runnable
         resolveOptions.setOutputReport(false); // TODO Show the report? LOG_QUIET suppresses it, even if setOutputReport is true
         ResolveReport resolveReport = ivy.resolve(createIvyFile(), resolveOptions);
 
-        // check for errors (if any) during resolve
         if (resolveReport.hasError())
         {
             List<String> problems = resolveReport.getAllProblemMessages();
@@ -273,7 +289,6 @@ public final class RymInstall implements Runnable
                     errorMsgs.append(problem);
                     errorMsgs.append("\n");
                 }
-                // System.err.println("Errors encountered during dependency resolution for package " + pkgCtx + " :");
                 System.err.println(errorMsgs);
             }
         }
