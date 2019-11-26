@@ -243,7 +243,7 @@ public final class RymInstall implements Runnable
         File ivyFile = File.createTempFile("ivy.xml", null);
         ivyFile.deleteOnExit();
 
-        // TODO What to put for "organization" and "module" values here:
+        // TODO What to put for "organization" and "module" values here (currently "reaktivity" is hardcoded):
         StringBuffer contents = new StringBuffer();
         contents.append("<ivy-module version=\"2.0\">\n");
         contents.append("  <info organisation=\"reaktivity\" module=\"reaktivity-deps\"/>\n");
@@ -256,8 +256,6 @@ public final class RymInstall implements Runnable
                 dependencyComponents[1],
                 entry.getValue()));
         }
-        contents.append("    <dependency org=\"commons-lang\" name=\"commons-lang\" rev=\"2.0\"/>\n");
-        contents.append("    <dependency org=\"commons-cli\" name=\"commons-cli\" rev=\"1.2\"/>\n");
         contents.append("  </dependencies>\n");
         contents.append("</ivy-module>\n");
 
@@ -275,7 +273,7 @@ public final class RymInstall implements Runnable
 
         ResolveOptions resolveOptions = new ResolveOptions();
         resolveOptions.setLog(LOG_QUIET); // TODO Pick logging option: Always, on download only, or never.
-        resolveOptions.setOutputReport(false); // TODO Show the report? LOG_QUIET suppresses it, even if setOutputReport is true
+        resolveOptions.setOutputReport(false); // TODO Show the report? Note: LOG_QUIET suppresses it, even if setOutputReport is true
         ResolveReport resolveReport = ivy.resolve(createIvyFile(), resolveOptions);
 
         if (resolveReport.hasError())
