@@ -25,10 +25,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.ivy.Ivy;
 import org.apache.ivy.core.report.ResolveReport;
@@ -59,68 +60,68 @@ public final class RymInstall implements Runnable
 
     public static final String MAVEN_CENTRAL_REPOSITORY = "https://repo1.maven.org/maven2/";
 
-    // TODO Hardcoding maven repo dir... What if user has a custom location?
     // ${user.home} will be populated by Ivy at runtime
     public static final String MAVEN_CACHE = "${user.home}/.m2/repository";
 
-    private final List<String> repositories;
+    private final Set<String> repositories;
     private final Map<String, String> dependencies;
 
     public RymInstall()
     {
-        this.repositories = new ArrayList<String>();
+        this.repositories = new LinkedHashSet<String>();
         this.dependencies = new LinkedHashMap<String, String>();
     }
 
     @Override
     public void run()
     {
-        System.out.format("Reading %s\n", DEPENDENCY_FILENAME);
         try
         {
+            System.out.format("Reading dependencies %s\n", DEPENDENCY_FILENAME);
             readDepsFile();
+
+            System.out.format("Generating lock file %s\n", DEPENDENCY_LOCK_FILENAME);
+            writeDepsLockFile();
+
+            System.out.println("Resolving dependencies");
+            ResolveReport resolveReport = resolveDependencies();
+
+            if (resolveReport.hasError())
+            {
+                List<String> problems = resolveReport.getAllProblemMessages();
+                if (problems != null && !problems.isEmpty())
+                {
+                    StringBuffer errorMsgs = new StringBuffer();
+                    for (String problem : problems)
+                    {
+                        errorMsgs.append(problem);
+                        errorMsgs.append("\n");
+                    }
+                    System.err.println(errorMsgs);
+                }
+            }
+            else
+            {
+                System.out.println("Dependencies were successfully resolved");
+            }
+
         }
         catch (FileNotFoundException e)
         {
-            System.err.format("Error: Can't find %s\n", DEPENDENCY_FILENAME);
-            return;
+            System.err.format("Error: %s\n", e.getMessage());
         }
         catch (IOException e)
         {
-            System.err.format("Error reading %s:\n", DEPENDENCY_FILENAME);
-            System.err.println(e.getMessage());
-            return;
-        }
-
-        System.out.format("Generating lock file %s\n", DEPENDENCY_LOCK_FILENAME);
-        try
-        {
-            writeDepsLockFile();
-        }
-        catch (IOException e)
-        {
-            System.err.format("Error writing %s:\n", DEPENDENCY_LOCK_FILENAME);
-            System.err.println(e.getMessage());
-            return;
-        }
-
-        try
-        {
-            resolveDependencies();
+            System.err.format("Error: %s\n", e.getMessage());
         }
         catch (ParseException e)
         {
             // TODO Should not occur because we are generating the settings file correctly.
-            e.printStackTrace();
-        }
-        catch (IOException e)
-        {
-            // TODO Handle this
-            e.printStackTrace();
+            System.err.format("Error: %s\n", e.getMessage());
         }
     }
 
-    private void readDepsFile() throws FileNotFoundException, IOException
+    private void readDepsFile() throws IOException
     {
         JsonElement deps = null;
         try (BufferedReader br = new BufferedReader(new FileReader(DEPENDENCY_FILENAME)))
@@ -176,13 +177,11 @@ public final class RymInstall implements Runnable
     {
         JsonObject depsLockObj = new JsonObject();
 
-        if (!repositories.contains(MAVEN_CENTRAL_REPOSITORY))
-        {
-            repositories.add(MAVEN_CENTRAL_REPOSITORY);
-        }
+        repositories.add(MAVEN_CENTRAL_REPOSITORY);
+
         JsonArray repositoriesArr = new JsonArray();
         depsLockObj.add(PROPERTY_REPOSITORIES, repositoriesArr);
-        repositories.forEach(r -> repositoriesArr.add(r));
+        repositories.forEach(repositoriesArr::add);
 
         if (dependencies.size() > 0)
         {
@@ -190,8 +189,7 @@ public final class RymInstall implements Runnable
             depsLockObj.add(PROPERTY_DEPENDENCIES, dependenciesObj);
             dependencies.forEach((dep, ver) ->
             {
-                JsonElement versionEl = new JsonPrimitive(ver);
-                dependenciesObj.add(dep, versionEl);
+                dependenciesObj.add(dep, new JsonPrimitive(ver));
             });
         }
 
@@ -223,14 +221,15 @@ public final class RymInstall implements Runnable
         contents.append("  </caches>\n");
         contents.append("  <resolvers>\n");
         contents.append("    <chain name=\"default\">\n");
-        contents.append("      <url name=\"blah\">\n");
-        contents.append("        <ivy pattern=\"https://repo1.maven.org/maven2/[module]/[revision]/ivy-[revision].xml\" />\n");
-        contents.append("        <artifact pattern=\"https://repo1.maven.org/maven2/[module]/[revision]/[artifact]-[revision].[ext]\" />");
+        // TODO Change name "blah" to something correct
+        contents.append("      <url name=\"blah\" m2compatible=\"true\" cache=\"mycache\">\n");
+        contents.append("        <ivy pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />\n");
+        contents.append("        <artifact pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />");
         contents.append("      </url>\n");
-//        contents.append("      <ibiblio name=\"central\" m2compatible=\"true\" cache=\"mycache\" />\n");
         contents.append("    </chain>\n");
         contents.append("  </resolvers>\n");
         contents.append("</ivysettings>\n");
+        System.out.format("\n%s\n", contents);
 
         BufferedWriter out = new BufferedWriter(new FileWriter(ivySettingsFile));
         out.write(contents.toString());
@@ -258,6 +257,7 @@ public final class RymInstall implements Runnable
         }
         contents.append("  </dependencies>\n");
         contents.append("</ivy-module>\n");
+        System.out.format("\n%s\n", contents);
 
         BufferedWriter out = new BufferedWriter(new FileWriter(ivyFile));
         out.write(contents.toString());
@@ -265,35 +265,16 @@ public final class RymInstall implements Runnable
         return ivyFile;
     }
 
-    private void resolveDependencies() throws ParseException, IOException
+    private ResolveReport resolveDependencies() throws ParseException, IOException
     {
         IvySettings ivySettings = new IvySettings();
-        org.apache.ivy.Ivy ivy = Ivy.newInstance(ivySettings);
+        Ivy ivy = Ivy.newInstance(ivySettings);
         ivy.configure(createIvySettingsFile());
 
         ResolveOptions resolveOptions = new ResolveOptions();
         resolveOptions.setLog(LOG_QUIET); // TODO Pick logging option: Always, on download only, or never.
-        resolveOptions.setOutputReport(false); // TODO Show the report? Note: LOG_QUIET suppresses it, even if setOutputReport is true
-        ResolveReport resolveReport = ivy.resolve(createIvyFile(), resolveOptions);
-
-        if (resolveReport.hasError())
-        {
-            List<String> problems = resolveReport.getAllProblemMessages();
-            if (problems != null && !problems.isEmpty())
-            {
-                StringBuffer errorMsgs = new StringBuffer();
-                for (String problem : problems)
-                {
-                    errorMsgs.append(problem);
-                    errorMsgs.append("\n");
-                }
-                System.err.println(errorMsgs);
-            }
-        }
-        else
-        {
-            System.out.println("Dependencies were successfully resolved");
-        }
+        resolveOptions.setOutputReport(false); // TODO Show report? Note: LOG_QUIET suppresses it, even if setOutputReport is true
+        return ivy.resolve(createIvyFile(), resolveOptions);
     }
 
 }
