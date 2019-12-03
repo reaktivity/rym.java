@@ -15,7 +15,8 @@
  */
 package org.reaktivity.rym.internal;
 
-import static org.apache.ivy.core.LogOptions.LOG_QUIET;
+import static org.apache.ivy.plugins.namespace.Namespace.SYSTEM_NAMESPACE;
+import static org.apache.ivy.plugins.resolver.IBiblioResolver.DEFAULT_M2_ROOT;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -24,7 +25,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.module.ModuleDescriptor;
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,9 +35,22 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.ivy.Ivy;
+import org.apache.ivy.core.IvyContext;
+import org.apache.ivy.core.cache.DefaultRepositoryCacheManager;
+import org.apache.ivy.core.install.InstallOptions;
+import org.apache.ivy.core.module.descriptor.DefaultModuleDescriptor;
+import org.apache.ivy.core.module.id.ModuleRevisionId;
 import org.apache.ivy.core.report.ResolveReport;
 import org.apache.ivy.core.resolve.ResolveOptions;
 import org.apache.ivy.core.settings.IvySettings;
+import org.apache.ivy.plugins.namespace.Namespace;
+import org.apache.ivy.plugins.resolver.ChainResolver;
+import org.apache.ivy.plugins.resolver.FileSystemResolver;
+import org.apache.ivy.plugins.resolver.IBiblioResolver;
+import org.apache.ivy.util.DefaultMessageLogger;
+import org.apache.ivy.util.Message;
+import org.apache.ivy.util.MessageLoggerEngine;
+import org.apache.ivy.util.filter.FilterHelper;
 
 import com.github.rvesse.airline.annotations.Command;
 import com.google.gson.Gson;
@@ -61,7 +77,7 @@ public final class RymInstall implements Runnable
     public static final String MAVEN_CENTRAL_REPOSITORY = "https://repo1.maven.org/maven2/";
 
     // ${user.home} will be populated by Ivy at runtime
-    public static final String MAVEN_CACHE = "${user.home}/.m2/repository";
+    public static final String MAVEN_CACHE = String.format("%s/.m2/repository", System.getProperty("user.home"));
 
     private final Set<String> repositories;
     private final Map<String, String> dependencies;
@@ -212,24 +228,29 @@ public final class RymInstall implements Runnable
         contents.append("  <property name=\"m2-pattern\"\n");
         contents.append("            value=\"[organisation]/[module]/[revision]/[module]-[revision](-[classifier]).[ext]\"\n");
         contents.append("            override=\"false\" />\n");
-        contents.append("  <caches>\n");
-        contents.append("    <cache name=\"mycache\"\n");
-        contents.append(String.format("           basedir=\"%s\"\n", MAVEN_CACHE));
+        contents.append(String.format("  <caches defaultCacheDir=\"%s\"\n", MAVEN_CACHE));
         contents.append("           ivyPattern=\"${m2-pattern}\"\n");
-        contents.append("           artifactPattern=\"${m2-pattern}\">\n");
-        contents.append("    </cache>\n");
+        contents.append("           artifactPattern=\"${m2-pattern} \">\n");
+//        contents.append("  <caches>\n");
+//        contents.append("    <cache name=\"mycache\"\n");
+//        contents.append(String.format("           basedir=\"%s\"\n", MAVEN_CACHE));
+//        contents.append("           ivyPattern=\"${m2-pattern}\"\n");
+//        contents.append("           artifactPattern=\"${m2-pattern}\">\n");
+//        contents.append("    </cache>\n");
         contents.append("  </caches>\n");
         contents.append("  <resolvers>\n");
         contents.append("    <chain name=\"default\">\n");
+//        contents.append("      <ibiblio name=\"central\" m2compatible=\"true\" cache=\"mycache\" root=\"https://repo1.maven.org/maven2/\"/>\n");
+        contents.append("      <ibiblio name=\"central\" m2compatible=\"true\" root=\"https://repo1.maven.org/maven2/\"/>\n");
         // TODO Change name "blah" to something correct
-        contents.append("      <url name=\"blah\" m2compatible=\"true\" cache=\"mycache\">\n");
-        contents.append("        <ivy pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />\n");
-        contents.append("        <artifact pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />");
-        contents.append("      </url>\n");
+//        contents.append("      <url name=\"blah\" m2compatible=\"true\" cache=\"mycache\">\n");
+//        contents.append("        <ivy pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />\n");
+//        contents.append("        <artifact pattern=\"https://repo1.maven.org/maven2/${m2-pattern}\" />");
+//        contents.append("      </url>\n");
         contents.append("    </chain>\n");
         contents.append("  </resolvers>\n");
         contents.append("</ivysettings>\n");
-        System.out.format("\n%s\n", contents);
+//        System.out.println(contents.toString());
 
         BufferedWriter out = new BufferedWriter(new FileWriter(ivySettingsFile));
         out.write(contents.toString());
@@ -265,16 +286,98 @@ public final class RymInstall implements Runnable
         return ivyFile;
     }
 
+    private void printIvy(Ivy ivy)
+    {
+        IvySettings ivySettings = ivy.getSettings();
+
+        System.out.print("  modules [");
+        String[] modules = ivy.listModules("org.reaktivity");
+        System.out.format("%d]:\n", modules.length);
+        for (String m: modules)
+        {
+            System.out.format("    m=%s\n", m);
+        };
+
+        System.out.println("  resolvers:");
+        ivySettings.getResolvers().forEach(r ->
+        {
+            if ("default".equalsIgnoreCase(r.getName()))
+            {
+                ChainResolver resolver = (ChainResolver)r;
+                System.out.format("    %s (%s)\n", resolver.getName(), resolver.getTypeName());
+                System.out.println("    dump:");
+                resolver.dumpSettings();
+                System.out.format("post-dump\n");
+            }
+            else if ("central".equalsIgnoreCase(r.getName()))
+            {
+                IBiblioResolver resolver = (IBiblioResolver)r;
+                System.out.format("    %s (%s)\n", resolver.getName(), resolver.getTypeName());
+                System.out.println("    dump:");
+                resolver.dumpSettings();
+                System.out.format("post-dump\n");
+            }
+            else
+            {
+                System.out.format("    %s (unknown type)\n", r.getName());
+            }
+        });
+        System.out.format("  Default resolver=%s\n", ivySettings.getDefaultResolver().getName());
+    }
+
     private ResolveReport resolveDependencies() throws ParseException, IOException
     {
-        IvySettings ivySettings = new IvySettings();
-        Ivy ivy = Ivy.newInstance(ivySettings);
-        ivy.configure(createIvySettingsFile());
+        Message.setDefaultLogger(new DefaultMessageLogger(Message.MSG_DEBUG));
 
-        ResolveOptions resolveOptions = new ResolveOptions();
-        resolveOptions.setLog(LOG_QUIET); // TODO Pick logging option: Always, on download only, or never.
-        resolveOptions.setOutputReport(false); // TODO Show report? Note: LOG_QUIET suppresses it, even if setOutputReport is true
-        return ivy.resolve(createIvyFile(), resolveOptions);
+        int flag = 1;
+
+        if (flag == 1 || flag == 3)
+        {
+            IBiblioResolver central = new IBiblioResolver();
+            central.setName("central");
+            central.setM2compatible(true);
+//            central.setNamespace(SYSTEM_NAMESPACE.getName());
+
+            FileSystemResolver local = new FileSystemResolver();
+            local.setName("local");
+            local.setM2compatible(true);
+            local.setLocal(true);
+            local.addArtifactPattern(String.format("%s/%s", MAVEN_CACHE, central.getPattern()));
+
+            IvySettings ivySettings = new IvySettings();
+            ivySettings.setDefaultCache(new File(MAVEN_CACHE));
+            ivySettings.setDefaultCacheIvyPattern(central.getPattern());
+            ivySettings.setDefaultCacheArtifactPattern(central.getPattern());
+
+            ivySettings.addConfigured(local);
+            ivySettings.addConfigured(central);
+//            ivySettings.setDefaultResolver("central");
+
+            Ivy ivy = Ivy.newInstance(ivySettings);
+
+            ModuleRevisionId reaktivity = ModuleRevisionId.newInstance("org.reaktivity", "reaktor", "0.86");
+
+            final InstallOptions options = new InstallOptions();
+            return ivy.install(reaktivity, "central", "local", options);
+        }
+
+        if (flag == 2 || flag == 3)
+        {
+            Ivy ivy2 = Ivy.newInstance();
+            ivy2.getLoggerEngine().pushLogger(new DefaultMessageLogger(Message.MSG_DEBUG));
+            ivy2.configure(createIvySettingsFile());
+
+            IvyContext.getContext().setIvy(ivy2);
+            System.out.println("\nivy2:");
+            printIvy(ivy2);
+
+            ResolveOptions resolveOptions = new ResolveOptions();
+            // resolveOptions.setLog(LOG_QUIET); // TODO Pick logging option: Always, on download only, or never.
+            // resolveOptions.setOutputReport(false); // TODO Show report? Note: LOG_QUIET suppresses it, even if setOutputReport is true
+            return ivy2.resolve(createIvyFile(), resolveOptions);
+        }
+
+        return null;
     }
 
 }
