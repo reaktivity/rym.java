@@ -101,6 +101,10 @@ public final class RymInstall implements Runnable
         {
             logger.error(String.format("Error: %s", ex.getMessage()));
         }
+        finally
+        {
+            logger.sumupProblems();
+        }
     }
 
     private void readDepsFile() throws IOException
