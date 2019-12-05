@@ -21,16 +21,16 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.ivy.Ivy;
 import org.apache.ivy.core.module.id.ModuleRevisionId;
 import org.apache.ivy.core.report.ResolveReport;
 import org.apache.ivy.core.resolve.ResolveOptions;
 import org.apache.ivy.core.settings.IvySettings;
+import org.apache.ivy.plugins.resolver.ChainResolver;
 import org.apache.ivy.plugins.resolver.IBiblioResolver;
 import org.apache.ivy.plugins.resolver.RepositoryResolver;
 import org.apache.ivy.util.DefaultMessageLogger;
@@ -39,7 +39,6 @@ import org.apache.ivy.util.Message;
 import com.github.rvesse.airline.annotations.Command;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -59,12 +58,12 @@ public final class RymInstall implements Runnable
     private static final String PROPERTY_REPOSITORIES = "repositories";
     private static final String PROPERTY_DEPENDENCIES = "dependencies";
 
-    private final Set<String> repositories;
+    private final Map<String, String> repositories;
     private final Map<String, String> dependencies;
 
     public RymInstall()
     {
-        this.repositories = new LinkedHashSet<>();
+        this.repositories = new LinkedHashMap<>();
         this.dependencies = new LinkedHashMap<>();
     }
 
@@ -79,22 +78,21 @@ public final class RymInstall implements Runnable
 
         try
         {
-            logger.info(String.format("Reading dependencies %s", DEPENDENCY_FILENAME));
+            logger.info(String.format("Reading dependencies: %s", DEPENDENCY_FILENAME));
             readDepsFile();
 
-            logger.info(String.format("Generating lock file %s", DEPENDENCY_LOCK_FILENAME));
+            logger.info(String.format("Updating lock file:   %s", DEPENDENCY_LOCK_FILENAME));
             writeDepsLockFile();
 
             logger.info("Resolving dependencies");
-            ResolveReport report = resolveDependencies(options);
-
-            if (report.hasError())
+            boolean resolved = resolveDependencies(options);
+            if (resolved)
             {
-                logger.error("Dependencies failed to resolve");
+                logger.info("Dependencies were successfully resolved");
             }
             else
             {
-                logger.info("Dependencies were successfully resolved");
+                logger.error("Dependencies failed to resolve");
             }
         }
         catch (Exception ex)
@@ -114,7 +112,8 @@ public final class RymInstall implements Runnable
         {
             deps = new JsonParser().parse(br);
         }
-        // It's possible for a file to pass the parse phase, but still not be valid JSON. So do an explicit check.
+        // It's possible for a file to pass the parse phase, but still not be valid JSON.
+        // So do an explicit check.
         if (!deps.isJsonObject())
         {
             // TODO Handle file not found
@@ -126,17 +125,23 @@ public final class RymInstall implements Runnable
         JsonElement repositoriesEl = depsObj.get(PROPERTY_REPOSITORIES);
         if (repositoriesEl != null)
         {
-            if (!repositoriesEl.isJsonArray())
+            if (!repositoriesEl.isJsonObject())
             {
-                throw new JsonSyntaxException(String.format("%s is not an array of strings", PROPERTY_REPOSITORIES));
+                throw new JsonSyntaxException(String.format("%s is not a JSON object", PROPERTY_REPOSITORIES));
             }
-            JsonArray repositoriesArr = (JsonArray)repositoriesEl;
-            for (int i = 0; i < repositoriesArr.size(); i++)
+            JsonObject repositoriesObj = (JsonObject)repositoriesEl;
+            repositoriesObj.entrySet().forEach(e ->
             {
-                String repository = repositoriesArr.get(i).isJsonPrimitive() ?
-                    repositoriesArr.get(i).getAsString() : repositoriesArr.get(i).toString();
-                repositories.add(repository);
-            }
+                if (e.getValue().isJsonPrimitive())
+                {
+                    repositories.put(e.getKey(), e.getValue().getAsString());
+                }
+                else
+                {
+                    throw new JsonSyntaxException(
+                        String.format("The value of %s.%s is not a string", PROPERTY_REPOSITORIES, e.getKey()));
+                }
+            });
         }
 
         JsonElement dependenciesEl = depsObj.get(PROPERTY_DEPENDENCIES);
@@ -163,9 +168,9 @@ public final class RymInstall implements Runnable
     {
         JsonObject depsLockObj = new JsonObject();
 
-        JsonArray repositoriesArr = new JsonArray();
-        depsLockObj.add(PROPERTY_REPOSITORIES, repositoriesArr);
-        repositories.forEach(repositoriesArr::add);
+        JsonObject repositoriesObj = new JsonObject();
+        depsLockObj.add(PROPERTY_REPOSITORIES, repositoriesObj);
+        repositories.forEach((n, u) -> repositoriesObj.add(n, new JsonPrimitive(u)));
 
         if (dependencies.size() > 0)
         {
@@ -185,20 +190,37 @@ public final class RymInstall implements Runnable
 
     }
 
-    private ResolveReport resolveDependencies(
+    private boolean resolveDependencies(
         ResolveOptions options) throws ParseException, IOException
     {
-        RepositoryResolver central = new IBiblioResolver();
-        central.setName("central");
-        central.setM2compatible(true);
+        ChainResolver chain = new ChainResolver();
+        chain.setName("default");
+
+        repositories.forEach((n, u) ->
+        {
+            RepositoryResolver resolver = new IBiblioResolver();
+            resolver.setName(n);
+            resolver.setM2compatible(true);
+            ((IBiblioResolver)resolver).setRoot(u);
+            chain.add(resolver);
+        });
 
         IvySettings ivySettings = new IvySettings();
-        ivySettings.addConfigured(central);
-        ivySettings.setDefaultResolver("central");
+        ivySettings.addConfigured(chain);
+        ivySettings.setDefaultResolver(chain.getName());
+
         Ivy ivy = Ivy.newInstance(ivySettings);
 
-        ModuleRevisionId reaktor = ModuleRevisionId.newInstance("org.reaktivity", "reaktor", "0.86");
-
-        return ivy.resolve(reaktor, options, false);
+        Iterator<Map.Entry<String, String>> depIterator = dependencies.entrySet().iterator();
+        boolean hasErrors = false;
+        while (depIterator.hasNext())
+        {
+            Map.Entry<String, String> el = depIterator.next();
+            String[] c = el.getKey().split(":");
+            ModuleRevisionId dependency = ModuleRevisionId.newInstance(c[0], c[1], el.getValue());
+            ResolveReport report = ivy.resolve(dependency, options, false);
+            hasErrors |= report.hasError();
+        }
+        return !hasErrors;
     }
 }
