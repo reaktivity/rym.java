@@ -21,7 +21,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -53,7 +52,7 @@ public final class RymInstall implements Runnable
     private static final String DEPENDENCY_FILENAME = "ry.deps";
     private static final String DEPENDENCY_LOCK_FILENAME = String.format("%s.lock", DEPENDENCY_FILENAME);
 
-    private static final String DEFAULT_GROUP_NAME = "org.reaktivity";
+    private static final String DEFAULT_GROUP_ID = "org.reaktivity";
 
     private static final String PROPERTY_REPOSITORIES = "repositories";
     private static final String PROPERTY_DEPENDENCIES = "dependencies";
@@ -112,11 +111,8 @@ public final class RymInstall implements Runnable
         {
             deps = new JsonParser().parse(br);
         }
-        // It's possible for a file to pass the parse phase, but still not be valid JSON.
-        // So do an explicit check.
         if (!deps.isJsonObject())
         {
-            // TODO Handle file not found
             throw new JsonSyntaxException(String.format("%s is not in JSON format\n", DEPENDENCY_FILENAME));
         }
 
@@ -149,18 +145,10 @@ public final class RymInstall implements Runnable
         {
             if (!dependenciesEl.isJsonObject())
             {
-                // TODO Handle file not found
                 throw new JsonSyntaxException(String.format("%s is not a JSON object", PROPERTY_DEPENDENCIES));
             }
             JsonObject dependenciesObj = (JsonObject)dependenciesEl;
-            dependenciesObj.keySet().forEach(key ->
-            {
-                String artifact = key.indexOf(':') > 0 ? key : String.format("%s:%s", DEFAULT_GROUP_NAME, key);
-                JsonElement versionEl = dependenciesObj.get(key);
-                // TODO Process version here. e.g. Is it a range?
-                String version = versionEl.isJsonPrimitive() ? versionEl.getAsString() : versionEl.toString();
-                dependencies.put(artifact, version);
-            });
+            dependenciesObj.entrySet().forEach(e -> dependencies.put(e.getKey(), e.getValue().getAsString()));
         }
     }
 
@@ -172,14 +160,11 @@ public final class RymInstall implements Runnable
         depsLockObj.add(PROPERTY_REPOSITORIES, repositoriesObj);
         repositories.forEach((n, u) -> repositoriesObj.add(n, new JsonPrimitive(u)));
 
-        if (dependencies.size() > 0)
+        if (!dependencies.isEmpty())
         {
             JsonObject dependenciesObj = new JsonObject();
             depsLockObj.add(PROPERTY_DEPENDENCIES, dependenciesObj);
-            dependencies.forEach((dep, ver) ->
-            {
-                dependenciesObj.add(dep, new JsonPrimitive(ver));
-            });
+            dependencies.forEach((dep, ver) -> dependenciesObj.add(dep, new JsonPrimitive(ver)));
         }
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -190,20 +175,27 @@ public final class RymInstall implements Runnable
 
     }
 
+    private RepositoryResolver newResolver(
+        Map.Entry<String, String> rootByName)
+    {
+        String name = rootByName.getKey();
+        String root = rootByName.getValue();
+
+        IBiblioResolver resolver = new IBiblioResolver();
+        resolver.setName(name);
+        resolver.setRoot(root);
+        resolver.setM2compatible(true);
+
+        return resolver;
+    }
+
     private boolean resolveDependencies(
         ResolveOptions options) throws ParseException, IOException
     {
         ChainResolver chain = new ChainResolver();
         chain.setName("default");
 
-        repositories.forEach((n, u) ->
-        {
-            RepositoryResolver resolver = new IBiblioResolver();
-            resolver.setName(n);
-            resolver.setM2compatible(true);
-            ((IBiblioResolver)resolver).setRoot(u);
-            chain.add(resolver);
-        });
+        repositories.entrySet().stream().map(this::newResolver).forEach(chain::add);
 
         IvySettings ivySettings = new IvySettings();
         ivySettings.addConfigured(chain);
@@ -211,14 +203,19 @@ public final class RymInstall implements Runnable
 
         Ivy ivy = Ivy.newInstance(ivySettings);
 
-        Iterator<Map.Entry<String, String>> depIterator = dependencies.entrySet().iterator();
         boolean hasErrors = false;
-        while (depIterator.hasNext())
+        for (Map.Entry<String, String> dependency : dependencies.entrySet())
         {
-            Map.Entry<String, String> el = depIterator.next();
-            String[] c = el.getKey().split(":");
-            ModuleRevisionId dependency = ModuleRevisionId.newInstance(c[0], c[1], el.getValue());
-            ResolveReport report = ivy.resolve(dependency, options, false);
+            String optionallyQualifiedArtifact = dependency.getKey();
+            String version = dependency.getValue();
+
+            String[] parts = optionallyQualifiedArtifact.split(":");
+            String groupId = parts.length == 2 ? parts[0] : DEFAULT_GROUP_ID;
+            String artifactId = parts[parts.length - 1];
+
+            ModuleRevisionId reference = ModuleRevisionId.newInstance(groupId, artifactId, version);
+
+            ResolveReport report = ivy.resolve(reference, options, false);
             hasErrors |= report.hasError();
         }
         return !hasErrors;
