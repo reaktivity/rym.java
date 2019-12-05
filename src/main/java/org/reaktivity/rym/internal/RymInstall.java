@@ -17,6 +17,7 @@ package org.reaktivity.rym.internal;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -52,10 +53,12 @@ public final class RymInstall implements Runnable
     private static final String DEPENDENCY_FILENAME = "ry.deps";
     private static final String DEPENDENCY_LOCK_FILENAME = String.format("%s.lock", DEPENDENCY_FILENAME);
 
-    private static final String DEFAULT_GROUP_ID = "org.reaktivity";
-
     private static final String PROPERTY_REPOSITORIES = "repositories";
     private static final String PROPERTY_DEPENDENCIES = "dependencies";
+
+    private static final String CACHE_DIR = String.format("%s/.ry", System.getProperty("user.home"));
+
+    private static final String DEFAULT_GROUP_ID = "org.reaktivity";
 
     private final Map<String, String> repositories;
     private final Map<String, String> dependencies;
@@ -198,10 +201,12 @@ public final class RymInstall implements Runnable
         repositories.entrySet().stream().map(this::newResolver).forEach(chain::add);
 
         IBiblioResolver central = new IBiblioResolver();
+        central.setName("central");
         central.setM2compatible(true);
         chain.add(central);
 
         IvySettings ivySettings = new IvySettings();
+        ivySettings.setDefaultCache(new File(CACHE_DIR));
         ivySettings.addConfigured(chain);
         ivySettings.setDefaultResolver(chain.getName());
 
