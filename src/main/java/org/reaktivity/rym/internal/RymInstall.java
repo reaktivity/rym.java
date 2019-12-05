@@ -197,6 +197,10 @@ public final class RymInstall implements Runnable
 
         repositories.entrySet().stream().map(this::newResolver).forEach(chain::add);
 
+        IBiblioResolver central = new IBiblioResolver();
+        central.setM2compatible(true);
+        chain.add(central);
+
         IvySettings ivySettings = new IvySettings();
         ivySettings.addConfigured(chain);
         ivySettings.setDefaultResolver(chain.getName());
