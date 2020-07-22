@@ -15,19 +15,27 @@
  */
 package org.reaktivity.rym.internal;
 
-import org.reaktivity.rym.internal.install.RymInstall;
+import javax.inject.Inject;
 
-import com.github.rvesse.airline.annotations.Cli;
-import com.github.rvesse.airline.help.Help;
+import com.github.rvesse.airline.HelpOption;
+import com.github.rvesse.airline.annotations.Option;
 
-@Cli(name = "rym",
-    description = "Reaktivity Management Tool",
-    defaultCommand = Help.class,
-    commands = { Help.class, RymInstall.class })
-public final class RymCli
+public abstract class RymCommand implements Runnable
 {
-    private RymCli()
+    @Inject
+    public HelpOption<RymCommand> helpOption;
+
+    @Option(name = { "-s", "--silent" }, hidden = true)
+    public Boolean silent = false;
+
+    @Override
+    public void run()
     {
-        // utility class
+        if (!helpOption.showHelpIfRequested())
+        {
+            invoke();
+        }
     }
+
+    protected abstract void invoke();
 }
