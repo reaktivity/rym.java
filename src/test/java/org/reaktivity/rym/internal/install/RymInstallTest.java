@@ -43,4 +43,26 @@ public class RymInstallTest
         assertThat(new File("ry.deps"), not(anExistingFile()));
         assertThat(new File("ry.deps.lock"), not(anExistingFile()));
     }
+
+    @Test
+    public void shouldInstallEcho()
+    {
+        String[] args =
+        {
+            "install",
+            "--config-directory", "src/test/conf/install",
+            "--cache-directory", "target/ry-cache",
+            "--silent"
+        };
+
+        Cli<Runnable> parser = new Cli<>(RymCli.class);
+        Runnable install = parser.parse(args);
+
+        install.run();
+
+        assertThat(install, instanceOf(RymInstall.class));
+        assertThat(new File("src/test/conf/install/ry.deps"), anExistingFile());
+        assertThat(new File("src/test/conf/install/ry.deps.lock"), anExistingFile());
+        assertThat(new File("target/ry-cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
+    }
 }

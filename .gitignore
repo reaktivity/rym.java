@@ -18,5 +18,4 @@ buildNumber.properties
 *.iws
 .DS_Store
 
-ry.deps
 ry.deps.lock

@@ -15,6 +15,8 @@
  */
 package org.reaktivity.rym.internal.install;
 
+import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -44,27 +46,29 @@ import com.github.rvesse.airline.annotations.Command;
     description = "Install dependencies")
 public final class RymInstall extends RymCommand
 {
-    private static final String DEPENDENCY_FILENAME = "ry.deps";
-    private static final String DEPENDENCY_LOCK_FILENAME = String.format("%s.lock", DEPENDENCY_FILENAME);
-
-    private static final String CACHE_DIR = String.format("%s/.ry", System.getProperty("user.home"));
-
     @Override
     public void invoke()
     {
-        MessageLogger logger = new DefaultMessageLogger(Message.MSG_WARN);
+        int level = silent ? Message.MSG_WARN : Message.MSG_INFO;
+        MessageLogger logger = new DefaultMessageLogger(level);
         Message.setDefaultLogger(logger);
 
         ResolveOptions options = new ResolveOptions();
         options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
+        options.setArtifactFilter(getArtifactTypeFilter("jar"));
+        options.setConfs("master,compile".split(","));
+        options.setRefresh(true);
 
         try
         {
-            logger.info(String.format("Reading dependencies: %s", DEPENDENCY_FILENAME));
-            RymConfiguration config = readDepsFile();
+            File depsFile = new File(configDir, "ry.deps");
+            logger.info(String.format("Reading config: %s", depsFile));
+            Jsonb builder = JsonbBuilder.create();
+            RymConfiguration config = builder.fromJson(new FileReader(depsFile), RymConfiguration.class);
 
-            logger.info(String.format("Updating lock file:   %s", DEPENDENCY_LOCK_FILENAME));
-            writeDepsLockFile(config);
+            File lockFile = new File(configDir, "ry.deps.lock");
+            logger.info(String.format("Updating lock file:   %s", lockFile));
+            builder.toJson(config, new FileWriter(lockFile));
 
             logger.info("Resolving dependencies");
             boolean resolved = resolveDependencies(config, options);
@@ -88,19 +92,6 @@ public final class RymInstall extends RymCommand
                 logger.sumupProblems();
             }
         }
-    }
-
-    private RymConfiguration readDepsFile() throws IOException
-    {
-        Jsonb builder = JsonbBuilder.create();
-        return builder.fromJson(new FileReader(DEPENDENCY_FILENAME), RymConfiguration.class);
-    }
-
-    private void writeDepsLockFile(
-        RymConfiguration config) throws IOException
-    {
-        Jsonb builder = JsonbBuilder.create();
-        builder.toJson(config, new FileWriter(DEPENDENCY_LOCK_FILENAME));
     }
 
     private RepositoryResolver newResolver(
@@ -132,7 +123,7 @@ public final class RymInstall extends RymCommand
         chain.add(central);
 
         IvySettings ivySettings = new IvySettings();
-        ivySettings.setDefaultCache(new File(CACHE_DIR));
+        ivySettings.setDefaultCache(cacheDir);
         ivySettings.addConfigured(chain);
         ivySettings.setDefaultResolver(chain.getName());
 

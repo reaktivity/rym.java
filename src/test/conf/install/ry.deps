@@ -1,0 +1,11 @@
+{
+  "repositories":
+  [ 
+    "https://repo1.maven.org/maven2/"
+  ],
+
+  "dependencies":
+  {
+    "org.reaktivity:nukleus-echo": "0.18"
+  }
+}

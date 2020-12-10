@@ -15,6 +15,8 @@
  */
 package org.reaktivity.rym.internal;
 
+import java.io.File;
+
 import javax.inject.Inject;
 
 import com.github.rvesse.airline.HelpOption;
@@ -25,8 +27,14 @@ public abstract class RymCommand implements Runnable
     @Inject
     public HelpOption<RymCommand> helpOption;
 
-    @Option(name = { "-s", "--silent" }, hidden = true)
+    @Option(name = { "--silent" }, hidden = true)
     public Boolean silent = false;
+
+    @Option(name = { "--config-directory" }, description = "config directory")
+    public File configDir = new File(".");
+
+    @Option(name = { "--cache-directory" }, description = "cache directory")
+    public File cacheDir = new File(".ry");
 
     @Override
     public void run()
