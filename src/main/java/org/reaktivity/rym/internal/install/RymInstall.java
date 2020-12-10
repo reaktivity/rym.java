@@ -116,11 +116,6 @@ public final class RymInstall extends RymCommand
 
         config.getRepositories().stream().map(this::newResolver).forEach(chain::add);
 
-        IBiblioResolver central = new IBiblioResolver();
-        central.setName("central");
-        central.setM2compatible(true);
-        chain.add(central);
-
         IvySettings ivySettings = new IvySettings();
         ivySettings.setDefaultCache(cacheDir.toFile());
         ivySettings.addConfigured(chain);
