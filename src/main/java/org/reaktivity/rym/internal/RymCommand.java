@@ -33,6 +33,9 @@ public abstract class RymCommand implements Runnable
     @Option(name = { "--config-directory" }, description = "config directory")
     public File configDir = new File(".");
 
+    @Option(name = { "--lock-directory" }, description = "lock directory", hidden = true)
+    public File lockDir;
+
     @Option(name = { "--cache-directory" }, description = "cache directory")
     public File cacheDir = new File(".ry");
 
@@ -41,6 +44,11 @@ public abstract class RymCommand implements Runnable
     {
         if (!helpOption.showHelpIfRequested())
         {
+            if (lockDir == null)
+            {
+                lockDir = configDir;
+            }
+
             invoke();
         }
     }

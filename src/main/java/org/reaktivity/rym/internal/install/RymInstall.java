@@ -66,8 +66,9 @@ public final class RymInstall extends RymCommand
             Jsonb builder = JsonbBuilder.create();
             RymConfiguration config = builder.fromJson(new FileReader(depsFile), RymConfiguration.class);
 
-            File lockFile = new File(configDir, "ry.deps.lock");
+            File lockFile = new File(lockDir, "ry.deps.lock");
             logger.info(String.format("Updating lock file:   %s", lockFile));
+            lockFile.getParentFile().mkdirs();
             builder.toJson(config, new FileWriter(lockFile));
 
             logger.info("Resolving dependencies");
