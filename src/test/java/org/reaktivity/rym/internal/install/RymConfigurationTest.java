@@ -186,8 +186,8 @@ public class RymConfigurationTest
         String text =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                    "}" +
+                    "[" +
+                    "]" +
                 "}";
 
         Jsonb builder = JsonbBuilder.create();
@@ -204,8 +204,8 @@ public class RymConfigurationTest
         String expected =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                    "}" +
+                    "[" +
+                    "]" +
                 "}";
 
         RymConfiguration config = new RymConfiguration();
@@ -223,9 +223,9 @@ public class RymConfigurationTest
         String text =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                        "\"reaktor\":\"1.0.0\"" +
-                    "}" +
+                    "[" +
+                        "\"reaktor:1.0.0\"" +
+                    "]" +
                 "}";
 
         Jsonb builder = JsonbBuilder.create();
@@ -241,9 +241,9 @@ public class RymConfigurationTest
         String expected =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                        "\"org.reaktivity:reaktor\":\"1.0.0\"" +
-                    "}" +
+                    "[" +
+                        "\"org.reaktivity:reaktor:1.0.0\"" +
+                    "]" +
                 "}";
 
         RymConfiguration config = new RymConfiguration();
@@ -261,10 +261,10 @@ public class RymConfigurationTest
         String text =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                        "\"reaktor\":\"1.0.0\"," +
-                        "\"nukleus-tcp\":\"1.0.0\"" +
-                    "}" +
+                    "[" +
+                        "\"reaktor:1.0.0\"," +
+                        "\"org.reaktivity:nukleus-tcp:1.0.0\"" +
+                    "]" +
                 "}";
 
         Jsonb builder = JsonbBuilder.create();
@@ -281,10 +281,10 @@ public class RymConfigurationTest
         String expected =
                 "{" +
                     "\"dependencies\":" +
-                    "{" +
-                        "\"org.reaktivity:reaktor\":\"1.0.0\"," +
-                        "\"org.reaktivity:nukleus-tcp\":\"1.0.0\"" +
-                    "}" +
+                    "[" +
+                        "\"org.reaktivity:reaktor:1.0.0\"," +
+                        "\"org.reaktivity:nukleus-tcp:1.0.0\"" +
+                    "]" +
                 "}";
 
         RymConfiguration config = new RymConfiguration();

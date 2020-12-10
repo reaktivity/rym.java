@@ -5,7 +5,7 @@
   ],
 
   "dependencies":
-  {
-    "org.reaktivity:nukleus-echo": "0.18"
-  }
+  [
+    "org.reaktivity:nukleus-echo:0.18"
+  ]
 }

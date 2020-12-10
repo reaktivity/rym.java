@@ -17,48 +17,54 @@ package org.reaktivity.rym.internal.install;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
+import javax.json.JsonArray;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
 import javax.json.bind.adapter.JsonbAdapter;
 
-public final class RymDependenciesAdapter implements JsonbAdapter<List<RymDependency>, JsonObject>
+public final class RymDependenciesAdapter implements JsonbAdapter<List<RymDependency>, JsonArray>
 {
     private static final String DEFAULT_GROUP_ID = "org.reaktivity";
 
+    private static final String DEPENDENCY_FORMAT = "%s:%s:%s";
+    private static final Pattern DEPENDENCY_PATTERN =
+            Pattern.compile("(?:(?<groupId>[^:]+):)?(?<artifactId>[^:]+):(?<version>[^:]+)");
+
     @Override
-    public JsonObject adaptToJson(
+    public JsonArray adaptToJson(
         List<RymDependency> dependencies) throws Exception
     {
-        JsonObjectBuilder builder = Json.createObjectBuilder();
+        JsonArrayBuilder builder = Json.createArrayBuilder();
         for (RymDependency dependency : dependencies)
         {
             String groupId = dependency.getGroupId();
             String artifactId = dependency.getArtifactId();
             String version = dependency.getVersion();
 
-            String key = String.format("%s:%s", groupId, artifactId);
-            String value = version;
+            String value = String.format(DEPENDENCY_FORMAT, groupId, artifactId, version);
 
-            builder.add(key, value);
+            builder.add(value);
         }
         return builder.build();
     }
 
     @Override
     public List<RymDependency> adaptFromJson(
-        JsonObject obj) throws Exception
+        JsonArray array) throws Exception
     {
         List<RymDependency> dependencies = null;
 
-        if (obj != null)
+        if (array != null)
         {
             List<RymDependency> newDependencies = new ArrayList<>();
-            obj.asJsonObject().forEach((k, v) -> newDependencies.add(adaptEntryFromJson(k, v)));
+            array.forEach(e -> newDependencies.add(adaptEntryFromJson(e)));
             dependencies = newDependencies;
         }
 
@@ -66,16 +72,23 @@ public final class RymDependenciesAdapter implements JsonbAdapter<List<RymDepend
     }
 
     private RymDependency adaptEntryFromJson(
-        String key,
         JsonValue value)
     {
         assert value.getValueType() == ValueType.STRING;
 
-        int colonAt = key.indexOf(':');
-        String groupId = colonAt != -1 ? key.substring(0, colonAt) : DEFAULT_GROUP_ID;
-        String artifactId = key.substring(colonAt + 1);
-        String version = ((JsonString) value).getString();
+        final String entry = ((JsonString) value).getString();
+        final Matcher matcher = DEPENDENCY_PATTERN.matcher(entry);
 
-        return new RymDependency(groupId, artifactId, version);
+        RymDependency dependency = null;
+        if (matcher.matches())
+        {
+            String groupId = Optional.ofNullable(matcher.group("groupId")).orElse(DEFAULT_GROUP_ID);
+            String artifactId = matcher.group("artifactId");
+            String version = matcher.group("version");
+
+            dependency = new RymDependency(groupId, artifactId, version);
+        }
+
+        return dependency;
     }
 }

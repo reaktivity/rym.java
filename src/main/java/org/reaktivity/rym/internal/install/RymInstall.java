@@ -58,6 +58,7 @@ public final class RymInstall extends RymCommand
         options.setArtifactFilter(getArtifactTypeFilter("jar"));
         options.setConfs("master,compile".split(","));
         options.setRefresh(true);
+        options.setOutputReport(false);
 
         try
         {
