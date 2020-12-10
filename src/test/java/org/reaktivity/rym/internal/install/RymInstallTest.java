@@ -16,9 +16,9 @@
 package org.reaktivity.rym.internal.install;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.io.FileMatchers.anExistingFile;
-import static org.junit.Assert.assertThat;
 
 import java.io.File;
 
