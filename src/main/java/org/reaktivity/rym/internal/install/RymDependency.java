@@ -17,39 +17,19 @@ package org.reaktivity.rym.internal.install;
 
 import java.util.Objects;
 
+import javax.json.bind.annotation.JsonbTypeAdapter;
+
+import org.reaktivity.rym.internal.install.adapters.RymDependencyAdapter;
+
+@JsonbTypeAdapter(RymDependencyAdapter.class)
 public final class RymDependency
 {
-    private String groupId;
-    private String artifactId;
-    private String version;
-
-    public RymDependency(
-        String groupId,
-        String artifactId,
-        String version)
-    {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-    }
+    public String groupId;
+    public String artifactId;
+    public String version;
 
     public RymDependency()
     {
-    }
-
-    public String getGroupId()
-    {
-        return groupId;
-    }
-
-    public String getArtifactId()
-    {
-        return artifactId;
-    }
-
-    public String getVersion()
-    {
-        return version;
     }
 
     @Override
@@ -76,5 +56,15 @@ public final class RymDependency
         return Objects.equals(this.groupId, that.groupId) &&
                 Objects.equals(this.artifactId, that.artifactId) &&
                 Objects.equals(this.version, that.version);
+    }
+
+    RymDependency(
+        String groupId,
+        String artifactId,
+        String version)
+    {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
     }
 }

@@ -97,7 +97,7 @@ public final class RymInstall extends RymCommand
         RymRepository repository)
     {
         String name = "maven"; // TODO
-        String root = repository.getLocation();
+        String root = repository.location;
 
         IBiblioResolver resolver = new IBiblioResolver();
         resolver.setName(name);
@@ -131,9 +131,9 @@ public final class RymInstall extends RymCommand
         boolean hasErrors = false;
         for (RymDependency dependency : config.getDependencies())
         {
-            String artifactId = dependency.getArtifactId();
-            String groupId = dependency.getGroupId();
-            String version = dependency.getVersion();
+            String groupId = dependency.groupId;
+            String artifactId = dependency.artifactId;
+            String version = dependency.version;
 
             ModuleRevisionId reference = ModuleRevisionId.newInstance(groupId, artifactId, version);
 

@@ -16,7 +16,6 @@
 package org.reaktivity.rym.internal.install;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -24,6 +23,9 @@ import static org.hamcrest.Matchers.emptyCollectionOf;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
+import java.util.Collections;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -90,7 +92,7 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setRepositories(emptyList());
+        config.repositories = Collections.emptyList();
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);
@@ -129,7 +131,8 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setRepositories(singletonList(new RymRepository("https://repo1.maven.org/maven2/")));
+        config.repositories = Collections.singletonList(
+                new RymRepository("https://repo1.maven.org/maven2/"));
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);
@@ -171,8 +174,9 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setRepositories(asList(new RymRepository("https://maven.example.com/maven2/"),
-                new RymRepository("https://repo1.maven.org/maven2/")));
+        config.repositories = Arrays.asList(
+                new RymRepository("https://maven.example.com/maven2/"),
+                new RymRepository("https://repo1.maven.org/maven2/"));
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);
@@ -209,7 +213,7 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setDependencies(emptyList());
+        config.dependencies = Collections.emptyList();
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);
@@ -247,7 +251,8 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setDependencies(singletonList(new RymDependency("org.reaktivity", "reaktor", "1.0.0")));
+        config.dependencies = Collections.singletonList(
+                new RymDependency("org.reaktivity", "reaktor", "1.0.0"));
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);
@@ -288,8 +293,9 @@ public class RymConfigurationTest
                 "}";
 
         RymConfiguration config = new RymConfiguration();
-        config.setDependencies(asList(new RymDependency("org.reaktivity", "reaktor", "1.0.0"),
-                new RymDependency("org.reaktivity", "nukleus-tcp", "1.0.0")));
+        config.dependencies = Arrays.asList(
+                new RymDependency("org.reaktivity", "reaktor", "1.0.0"),
+                new RymDependency("org.reaktivity", "nukleus-tcp", "1.0.0"));
 
         Jsonb builder = JsonbBuilder.create();
         String actual = builder.toJson(config);

@@ -17,19 +17,17 @@ package org.reaktivity.rym.internal.install;
 
 import java.util.Objects;
 
+import javax.json.bind.annotation.JsonbTypeAdapter;
+
+import org.reaktivity.rym.internal.install.adapters.RymRepositoryAdapter;
+
+@JsonbTypeAdapter(RymRepositoryAdapter.class)
 public final class RymRepository
 {
-    private String location;
+    public String location;
 
-    public RymRepository(
-        String location)
+    public RymRepository()
     {
-        this.location = location;
-    }
-
-    public String getLocation()
-    {
-        return location;
     }
 
     @Override
@@ -54,5 +52,11 @@ public final class RymRepository
 
         RymRepository that = (RymRepository) obj;
         return Objects.equals(this.location, that.location);
+    }
+
+    RymRepository(
+        String location)
+    {
+        this.location = location;
     }
 }
