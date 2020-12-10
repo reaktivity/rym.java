@@ -57,7 +57,7 @@ public final class RymInstall extends RymCommand
         ResolveOptions options = new ResolveOptions();
         options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
         options.setArtifactFilter(getArtifactTypeFilter("jar"));
-        options.setConfs("master,compile".split(","));
+        options.setConfs("master,runtime".split(","));
         options.setRefresh(true);
         options.setOutputReport(false);
 
