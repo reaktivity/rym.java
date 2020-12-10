@@ -15,7 +15,8 @@
  */
 package org.reaktivity.rym.internal;
 
-import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import javax.inject.Inject;
 
@@ -27,17 +28,25 @@ public abstract class RymCommand implements Runnable
     @Inject
     public HelpOption<RymCommand> helpOption;
 
-    @Option(name = { "--silent" }, hidden = true)
+    @Option(name = { "--silent" },
+            hidden = true)
     public Boolean silent = false;
 
-    @Option(name = { "--config-directory" }, description = "config directory")
-    public File configDir = new File(".");
+    @Option(name = { "--config-directory" },
+            description = "config directory",
+            typeConverterProvider = RymPathConverterProvider.class)
+    public Path configDir = Paths.get("");
 
-    @Option(name = { "--lock-directory" }, description = "lock directory", hidden = true)
-    public File lockDir;
+    @Option(name = { "--lock-directory" },
+            description = "lock directory",
+            typeConverterProvider = RymPathConverterProvider.class,
+            hidden = true)
+    public Path lockDir;
 
-    @Option(name = { "--cache-directory" }, description = "cache directory")
-    public File cacheDir = new File(".ry");
+    @Option(name = { "--cache-directory" },
+            description = "cache directory",
+            typeConverterProvider = RymPathConverterProvider.class)
+    public Path cacheDir = Paths.get(".ry", "cache");
 
     @Override
     public void run()

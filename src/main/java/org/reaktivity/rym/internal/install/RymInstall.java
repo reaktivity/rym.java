@@ -15,12 +15,13 @@
  */
 package org.reaktivity.rym.internal.install;
 
+import static java.nio.file.Files.createDirectories;
+import static java.nio.file.Files.newInputStream;
+import static java.nio.file.Files.newOutputStream;
 import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.text.ParseException;
 
 import javax.json.bind.Jsonb;
@@ -62,25 +63,21 @@ public final class RymInstall extends RymCommand
 
         try
         {
-            File depsFile = new File(configDir, "ry.deps");
-            logger.info(String.format("Reading config: %s", depsFile));
+            Path depsFile = configDir.resolve("ry.deps");
+            logger.info(String.format("reading %s", depsFile));
             Jsonb builder = JsonbBuilder.create();
-            RymConfiguration config = builder.fromJson(new FileReader(depsFile), RymConfiguration.class);
+            RymConfiguration config = builder.fromJson(newInputStream(depsFile), RymConfiguration.class);
 
-            File lockFile = new File(lockDir, "ry.deps.lock");
-            logger.info(String.format("Updating lock file:   %s", lockFile));
-            lockFile.getParentFile().mkdirs();
-            builder.toJson(config, new FileWriter(lockFile));
+            Path lockFile = lockDir.resolve("ry.deps.lock");
+            logger.info(String.format("updating %s", lockFile));
+            createDirectories(lockDir);
+            builder.toJson(config, newOutputStream(lockFile));
 
-            logger.info("Resolving dependencies");
+            createDirectories(cacheDir);
             boolean resolved = resolveDependencies(config, options);
             if (resolved)
             {
-                logger.info("Dependencies were successfully resolved");
-            }
-            else
-            {
-                logger.error("Dependencies failed to resolve");
+                logger.info("resolved dependencies");
             }
         }
         catch (Exception ex)
@@ -125,7 +122,7 @@ public final class RymInstall extends RymCommand
         chain.add(central);
 
         IvySettings ivySettings = new IvySettings();
-        ivySettings.setDefaultCache(cacheDir);
+        ivySettings.setDefaultCache(cacheDir.toFile());
         ivySettings.addConfigured(chain);
         ivySettings.setDefaultResolver(chain.getName());
 
