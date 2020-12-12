@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal.install.adapters;
+package org.reaktivity.rym.internal.commands.install.adapters;
 
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -23,7 +23,7 @@ import javax.json.Json;
 import javax.json.JsonString;
 import javax.json.bind.adapter.JsonbAdapter;
 
-import org.reaktivity.rym.internal.install.RymDependency;
+import org.reaktivity.rym.internal.commands.install.RymDependency;
 
 public final class RymDependencyAdapter implements JsonbAdapter<RymDependency, JsonString>
 {

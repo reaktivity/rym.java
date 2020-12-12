@@ -15,7 +15,7 @@
  */
 package org.reaktivity.rym.internal;
 
-import org.reaktivity.rym.internal.install.RymInstall;
+import org.reaktivity.rym.internal.commands.install.RymInstall;
 
 import com.github.rvesse.airline.annotations.Cli;
 import com.github.rvesse.airline.help.Help;

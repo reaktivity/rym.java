@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal.install;
+package org.reaktivity.rym.internal.commands.install;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;

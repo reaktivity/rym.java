@@ -20,6 +20,8 @@ import java.nio.file.Paths;
 
 import javax.inject.Inject;
 
+import org.reaktivity.rym.internal.types.RymPathConverterProvider;
+
 import com.github.rvesse.airline.HelpOption;
 import com.github.rvesse.airline.annotations.Option;
 

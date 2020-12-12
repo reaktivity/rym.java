@@ -13,29 +13,27 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal.install;
+package org.reaktivity.rym.internal.commands.install;
 
 import java.util.Objects;
 
 import javax.json.bind.annotation.JsonbTypeAdapter;
 
-import org.reaktivity.rym.internal.install.adapters.RymDependencyAdapter;
+import org.reaktivity.rym.internal.commands.install.adapters.RymRepositoryAdapter;
 
-@JsonbTypeAdapter(RymDependencyAdapter.class)
-public final class RymDependency
+@JsonbTypeAdapter(RymRepositoryAdapter.class)
+public final class RymRepository
 {
-    public String groupId;
-    public String artifactId;
-    public String version;
+    public String location;
 
-    public RymDependency()
+    public RymRepository()
     {
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(groupId, artifactId, version);
+        return Objects.hash(location);
     }
 
     @Override
@@ -47,24 +45,18 @@ public final class RymDependency
             return true;
         }
 
-        if (!(obj instanceof RymDependency))
+        if (!(obj instanceof RymRepository))
         {
             return false;
         }
 
-        RymDependency that = (RymDependency) obj;
-        return Objects.equals(this.groupId, that.groupId) &&
-                Objects.equals(this.artifactId, that.artifactId) &&
-                Objects.equals(this.version, that.version);
+        RymRepository that = (RymRepository) obj;
+        return Objects.equals(this.location, that.location);
     }
 
-    RymDependency(
-        String groupId,
-        String artifactId,
-        String version)
+    RymRepository(
+        String location)
     {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
+        this.location = location;
     }
 }

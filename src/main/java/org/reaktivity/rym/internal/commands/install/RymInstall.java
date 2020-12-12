@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal.install;
+package org.reaktivity.rym.internal.commands.install;
 
 import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.newInputStream;

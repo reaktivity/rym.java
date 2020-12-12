@@ -13,29 +13,26 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal.install.adapters;
+package org.reaktivity.rym.internal.commands.install;
 
-import javax.json.Json;
-import javax.json.JsonString;
-import javax.json.bind.adapter.JsonbAdapter;
+import java.util.List;
 
-import org.reaktivity.rym.internal.install.RymRepository;
-
-public final class RymRepositoryAdapter implements JsonbAdapter<RymRepository, JsonString>
+public final class RymConfiguration
 {
-    @Override
-    public JsonString adaptToJson(
-        RymRepository repository)
+    public List<RymDependency> dependencies;
+    public List<RymRepository> repositories;
+
+    public RymConfiguration()
     {
-        return Json.createValue(repository.location);
     }
 
-    @Override
-    public RymRepository adaptFromJson(
-        JsonString location)
+    public List<RymDependency> getDependencies()
     {
-        RymRepository repository = new RymRepository();
-        repository.location = location.getString();
-        return repository;
+        return dependencies;
+    }
+
+    public List<RymRepository> getRepositories()
+    {
+        return repositories;
     }
 }
