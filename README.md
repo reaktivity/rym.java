@@ -1,4 +1,4 @@
-# Reaktivity Management Tool
+# rym
 
 [![Build Status][build-status-image]][build-status]
 [![Code Coverage][code-coverage-image]][code-coverage]
