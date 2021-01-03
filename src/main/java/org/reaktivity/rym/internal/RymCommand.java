@@ -39,16 +39,19 @@ public abstract class RymCommand implements Runnable
             typeConverterProvider = RymPathConverterProvider.class)
     public Path configDir = Paths.get("");
 
+    @Option(name = { "--output-directory" },
+            description = "output directory",
+            typeConverterProvider = RymPathConverterProvider.class)
+    public Path outputDir = Paths.get(".rym");
+
     @Option(name = { "--lock-directory" },
             description = "lock directory",
             typeConverterProvider = RymPathConverterProvider.class,
             hidden = true)
     public Path lockDir;
 
-    @Option(name = { "--cache-directory" },
-            description = "cache directory",
-            typeConverterProvider = RymPathConverterProvider.class)
-    public Path cacheDir = Paths.get(".ry", "cache");
+    protected Path cacheDir;
+    protected Path modulesDir;
 
     @Override
     public void run()
@@ -59,6 +62,9 @@ public abstract class RymCommand implements Runnable
             {
                 lockDir = configDir;
             }
+
+            cacheDir = outputDir.resolve("cache");
+            modulesDir = outputDir.resolve("modules");
 
             invoke();
         }

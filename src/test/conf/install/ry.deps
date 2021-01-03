@@ -6,6 +6,7 @@
 
   "dependencies":
   [
+    "org.reaktivity:reaktor:0.153",
     "org.reaktivity:nukleus-echo:0.18"
   ]
 }

@@ -20,15 +20,23 @@ import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.ParseException;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
+import javax.json.bind.JsonbConfig;
 
 import org.apache.ivy.Ivy;
+import org.apache.ivy.core.module.id.ArtifactRevisionId;
 import org.apache.ivy.core.module.id.ModuleRevisionId;
+import org.apache.ivy.core.report.ArtifactDownloadReport;
 import org.apache.ivy.core.report.ResolveReport;
 import org.apache.ivy.core.resolve.ResolveOptions;
 import org.apache.ivy.core.settings.IvySettings;
@@ -54,18 +62,13 @@ public final class RymInstall extends RymCommand
         MessageLogger logger = new DefaultMessageLogger(level);
         Message.setDefaultLogger(logger);
 
-        ResolveOptions options = new ResolveOptions();
-        options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
-        options.setArtifactFilter(getArtifactTypeFilter("jar"));
-        options.setConfs("master,runtime".split(","));
-        options.setRefresh(true);
-        options.setOutputReport(false);
-
         try
         {
             Path depsFile = configDir.resolve("ry.deps");
             logger.info(String.format("reading %s", depsFile));
-            Jsonb builder = JsonbBuilder.create();
+            Jsonb builder = JsonbBuilder.newBuilder()
+                                        .withConfig(new JsonbConfig().withFormatting(true))
+                                        .build();
             RymConfiguration config = builder.fromJson(newInputStream(depsFile), RymConfiguration.class);
 
             Path lockFile = lockDir.resolve("ry.deps.lock");
@@ -73,12 +76,14 @@ public final class RymInstall extends RymCommand
             createDirectories(lockDir);
             builder.toJson(config, newOutputStream(lockFile));
 
-            createDirectories(cacheDir);
-            boolean resolved = resolveDependencies(config, options);
-            if (resolved)
+            List<ArtifactDownloadReport> artifacts = resolveDependencies(config);
+
+            if (artifacts != null)
             {
                 logger.info("resolved dependencies");
             }
+
+            copyModules(artifacts);
         }
         catch (Exception ex)
         {
@@ -90,6 +95,20 @@ public final class RymInstall extends RymCommand
             {
                 logger.sumupProblems();
             }
+        }
+    }
+
+    private void copyModules(
+        List<ArtifactDownloadReport> artifacts) throws IOException
+    {
+        Files.createDirectories(modulesDir);
+        for (ArtifactDownloadReport artifact : artifacts)
+        {
+            ArtifactRevisionId id = artifact.getArtifact().getId();
+            File localFile = artifact.getLocalFile();
+            String moduleName = String.format("%s.jar", id.getArtifactId().getName());
+            Path target = modulesDir.resolve(moduleName);
+            Files.copy(localFile.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -107,14 +126,22 @@ public final class RymInstall extends RymCommand
         return resolver;
     }
 
-    private boolean resolveDependencies(
-        RymConfiguration config,
-        ResolveOptions options) throws ParseException, IOException
+    private List<ArtifactDownloadReport> resolveDependencies(
+        RymConfiguration config) throws ParseException, IOException
     {
+        ResolveOptions options = new ResolveOptions();
+        options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
+        options.setArtifactFilter(getArtifactTypeFilter("jar"));
+        options.setConfs("master,runtime".split(","));
+        options.setRefresh(true);
+        options.setOutputReport(false);
+
         ChainResolver chain = new ChainResolver();
         chain.setName("default");
 
         config.getRepositories().stream().map(this::newResolver).forEach(chain::add);
+
+        createDirectories(cacheDir);
 
         IvySettings ivySettings = new IvySettings();
         ivySettings.setDefaultCache(cacheDir.toFile());
@@ -123,7 +150,7 @@ public final class RymInstall extends RymCommand
 
         Ivy ivy = Ivy.newInstance(ivySettings);
 
-        boolean hasErrors = false;
+        List<ArtifactDownloadReport> artifacts = new LinkedList<>();
         for (RymDependency dependency : config.getDependencies())
         {
             String groupId = dependency.groupId;
@@ -133,8 +160,17 @@ public final class RymInstall extends RymCommand
             ModuleRevisionId reference = ModuleRevisionId.newInstance(groupId, artifactId, version);
 
             ResolveReport report = ivy.resolve(reference, options, false);
-            hasErrors |= report.hasError();
+            if (report.hasError())
+            {
+                artifacts = null;
+                break;
+            }
+
+            for (ArtifactDownloadReport artifact : report.getAllArtifactsReports())
+            {
+                artifacts.add(artifact);
+            }
         }
-        return !hasErrors;
+        return artifacts;
     }
 }

@@ -52,7 +52,7 @@ public class RymInstallTest
             "install",
             "--config-directory", "src/test/conf/install",
             "--lock-directory", "target/test-locks/install",
-            "--cache-directory", "target/ry-cache",
+            "--output-directory", "target",
             "--silent"
         };
 
@@ -64,6 +64,7 @@ public class RymInstallTest
         assertThat(install, instanceOf(RymInstall.class));
         assertThat(new File("src/test/conf/install/ry.deps"), anExistingFile());
         assertThat(new File("target/test-locks/install/ry.deps.lock"), anExistingFile());
-        assertThat(new File("target/ry-cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
+        assertThat(new File("target/cache/org.reaktivity/reaktor/jars/reaktor-0.153.jar"), anExistingFile());
+        assertThat(new File("target/cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
     }
 }
