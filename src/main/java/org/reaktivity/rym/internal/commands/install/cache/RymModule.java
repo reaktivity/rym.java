@@ -15,10 +15,9 @@
  */
 package org.reaktivity.rym.internal.commands.install.cache;
 
-import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
-import static java.util.stream.Collectors.toSet;
 
+import java.lang.module.ModuleDescriptor;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -28,32 +27,31 @@ public final class RymModule
 {
     public final String name;
     public final Set<Path> paths;
-    public final Set<RymModule> depends;
+    public final RymArtifactId id;
     public final boolean automatic;
 
     public RymModule()
     {
         this.name = "__unnamed__";
         this.paths = new LinkedHashSet<>();
-        this.depends = emptySet();
+        this.id = null;
         this.automatic = false;
     }
 
     public RymModule(
-        String id,
-        Path path,
-        boolean automatic)
+        ModuleDescriptor descriptor,
+        RymArtifact artifact)
     {
-        this.name = id;
-        this.paths = singleton(path);
-        this.depends = new LinkedHashSet<>();
-        this.automatic = automatic;
+        this.name = descriptor.name();
+        this.automatic = descriptor.isAutomatic();
+        this.paths = singleton(artifact.path);
+        this.id = artifact.id;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, paths, depends, automatic);
+        return Objects.hash(name, automatic, paths, id);
     }
 
     @Override
@@ -73,14 +71,13 @@ public final class RymModule
         RymModule that = (RymModule) obj;
         return Objects.equals(this.name, that.name) &&
                 Objects.equals(this.paths, that.paths) &&
-                Objects.equals(this.depends, that.depends) &&
+                Objects.equals(this.id, that.id) &&
                 this.automatic == that.automatic;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s%s -> %s %s",
-                name, automatic ? "+" : "", depends.stream().map(m ->  m.name).collect(toSet()), paths);
+        return String.format("%s%s -> %s %s", name, automatic ? "+" : "", id, paths);
     }
 }

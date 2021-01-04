@@ -15,22 +15,25 @@
  */
 package org.reaktivity.rym.internal.commands.install.cache;
 
-import static java.util.Comparator.reverseOrder;
 import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.ivy.Ivy;
+import org.apache.ivy.core.module.descriptor.Configuration;
+import org.apache.ivy.core.module.descriptor.DefaultDependencyDescriptor;
+import org.apache.ivy.core.module.descriptor.DefaultModuleDescriptor;
+import org.apache.ivy.core.module.descriptor.DependencyDescriptor;
+import org.apache.ivy.core.module.descriptor.ModuleDescriptor;
 import org.apache.ivy.core.module.id.ModuleRevisionId;
 import org.apache.ivy.core.report.ArtifactDownloadReport;
 import org.apache.ivy.core.report.ResolveReport;
+import org.apache.ivy.core.resolve.IvyNode;
 import org.apache.ivy.core.resolve.ResolveOptions;
 import org.apache.ivy.core.settings.IvySettings;
 import org.apache.ivy.plugins.resolver.ChainResolver;
@@ -41,10 +44,8 @@ import org.reaktivity.rym.internal.commands.install.RymRepository;
 
 public final class RymCache
 {
-    private final Path directory;
     private final Ivy ivy;
     private final ResolveOptions options;
-    private final Map<ModuleRevisionId, RymArtifact> artifacts;
 
     public RymCache(
         List<RymRepository> repositories,
@@ -67,75 +68,69 @@ public final class RymCache
         ivySettings.addConfigured(chain);
         ivySettings.setDefaultResolver(chain.getName());
 
-        this.directory = directory;
         this.ivy = Ivy.newInstance(ivySettings);
-
-        this.artifacts = new LinkedHashMap<>();
     }
 
-    public void clean() throws IOException
+    public List<RymArtifact> resolve(
+        List<RymDependency> dependencies)
     {
-        Files.walk(directory)
-             .sorted(reverseOrder())
-             .forEach(RymCache::deleteFile);
-    }
+        ModuleRevisionId[] resolveIds = dependencies.stream()
+            .map(d -> ModuleRevisionId.newInstance(d.groupId, d.artifactId, d.version))
+            .collect(Collectors.toList())
+            .toArray(new ModuleRevisionId[0]);
 
-    public RymArtifact resolve(
-        RymArtifactId dependency)
-    {
-        return resolve(dependency.group, dependency.artifact, dependency.version);
-    }
+        boolean changing = false;
+        DefaultModuleDescriptor moduleDescriptor = new DefaultModuleDescriptor(
+                ModuleRevisionId.newInstance("caller", "all-caller", "working"), "integration", null, true);
+        for (String conf : options.getConfs())
+        {
+            moduleDescriptor.addConfiguration(new Configuration(conf));
+        }
+        moduleDescriptor.setLastModified(System.currentTimeMillis());
+        for (ModuleRevisionId mrid : resolveIds)
+        {
+            DefaultDependencyDescriptor dd = new DefaultDependencyDescriptor(moduleDescriptor, mrid,
+                    true, changing, options.isTransitive());
+            for (String conf : options.getConfs())
+            {
+                dd.addDependencyConfiguration(conf, conf);
+            }
+            moduleDescriptor.addDependency(dd);
+        }
 
-    public RymArtifact resolve(
-        RymDependency dependency)
-    {
-        return resolve(dependency.groupId, dependency.artifactId, dependency.version);
-    }
-
-    private RymArtifact resolve(
-        String groupId,
-        String artifactId,
-        String version)
-    {
-        ModuleRevisionId reference = ModuleRevisionId.newInstance(groupId, artifactId, version);
-
-        return artifacts.computeIfAbsent(reference, this::resolve);
-    }
-
-    private RymArtifact resolve(
-        ModuleRevisionId resolveId)
-    {
-        RymArtifact artifact = null;
-
+        List<RymArtifact> artifacts = new LinkedList<>();
         try
         {
-            ResolveReport resolved = ivy.resolve(resolveId, options, false);
-            if (resolved.hasError())
+            ResolveReport report = ivy.resolve(moduleDescriptor, options);
+            if (report.hasError())
             {
-                throw new Exception("Unable to resolve: " + resolveId);
+                throw new Exception("Unable to resolve: " + report);
             }
 
-            ArtifactDownloadReport[] downloads = resolved.getAllArtifactsReports();
-
-            Set<RymArtifactId> depends = new LinkedHashSet<>();
-            for (ArtifactDownloadReport download : downloads)
+            for (IvyNode node : report.getDependencies())
             {
-                ModuleRevisionId dependId = download.getArtifact().getModuleRevisionId();
-                if (!resolveId.equals(dependId))
-                {
-                    download.getArtifact().getModuleRevisionId();
-                    RymArtifactId depend = newArtifactId(dependId);
-                    depends.add(depend);
-                }
-            }
+                ModuleDescriptor descriptor = node.getDescriptor();
+                ModuleRevisionId resolveId = descriptor.getModuleRevisionId();
+                ArtifactDownloadReport[] downloads = report.getArtifactsReports(resolveId);
 
-            for (ArtifactDownloadReport download : downloads)
-            {
-                if (resolveId.equals(download.getArtifact().getModuleRevisionId()))
+                if (downloads.length != 0)
                 {
+                    Set<RymArtifactId> depends = new LinkedHashSet<>();
+                    for (DependencyDescriptor dd : descriptor.getDependencies())
+                    {
+                        ModuleRevisionId dependId = dd.getDependencyRevisionId();
+                        ArtifactDownloadReport[] dependDownloads = report.getArtifactsReports(dependId);
+                        if (dependDownloads.length != 0)
+                        {
+                            RymArtifactId depend = newArtifactId(dependId);
+                            depends.add(depend);
+                        }
+                    }
+
                     RymArtifactId id = newArtifactId(resolveId);
-                    Path local = download.getLocalFile().toPath();
-                    artifact = new RymArtifact(id, local, depends);
+                    Path local = downloads[0].getLocalFile().toPath();
+                    RymArtifact artifact = new RymArtifact(id, local, depends);
+                    artifacts.add(artifact);
                 }
             }
         }
@@ -144,7 +139,7 @@ public final class RymCache
             throw new RuntimeException(ex);
         }
 
-        return artifact;
+        return artifacts;
     }
 
     private RymArtifactId newArtifactId(
@@ -169,18 +164,5 @@ public final class RymCache
         resolver.setM2compatible(true);
 
         return resolver;
-    }
-
-    private static void deleteFile(
-        Path file)
-    {
-        try
-        {
-            Files.delete(file);
-        }
-        catch (IOException ex)
-        {
-            throw new RuntimeException(ex);
-        }
     }
 }

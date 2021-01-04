@@ -20,14 +20,16 @@ import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 
 import java.io.IOException;
+import java.lang.module.ModuleDescriptor;
+import java.lang.module.ModuleFinder;
+import java.lang.module.ModuleReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -73,26 +75,27 @@ public final class RymInstall extends RymCommand
             Collection<RymArtifact> artifacts = resolveDependencies(config);
             logger.info("resolved dependencies");
 
-            Map<String, RymModule> modules = new LinkedHashMap<>();
+            RymModule unnamed = new RymModule();
+            Map<RymArtifactId, RymModule> modules = new LinkedHashMap<>();
             for (RymArtifact artifact : artifacts)
             {
-                String name = artifact.id.toString(); // TODO
-                boolean automatic = false; // TODO
-                if (name == null)
+                ModuleDescriptor descriptor = moduleDescriptor(artifact.path);
+
+                if (descriptor == null)
                 {
-                    RymModule unnamed = modules.computeIfAbsent("", n -> new RymModule());
                     unnamed.paths.add(artifact.path);
+                    modules.put(artifact.id, unnamed);
                 }
                 else
                 {
-                    RymModule module = new RymModule(name, artifact.path, automatic);
-                    modules.put(name, module);
+                    RymModule module = new RymModule(descriptor, artifact);
+                    modules.put(artifact.id, module);
                 }
             }
 
-            //modules.values().forEach(System.out::println);
+            modules.values().forEach(System.out::println);
 
-            copyModules(artifacts);
+            copyModules(modules.values());
             logger.info("prepared modules");
         }
         catch (Exception ex)
@@ -115,8 +118,9 @@ public final class RymInstall extends RymCommand
 
         RymCache cache = new RymCache(config.repositories, cacheDir);
 
-        cache.clean();
+        return cache.resolve(config.dependencies);
 
+        /*
         Map<RymArtifactId, RymArtifact> artifacts = new LinkedHashMap<>();
         List<RymArtifactId> artifactIds = new LinkedList<>();
         for (RymDependency dependency : config.dependencies)
@@ -143,17 +147,31 @@ public final class RymInstall extends RymCommand
         }
 
         return artifacts.values();
+        */
     }
 
     private void copyModules(
-        Collection<RymArtifact> artifacts) throws IOException
+        Collection<RymModule> modules) throws IOException
     {
         Files.createDirectories(modulesDir);
-        for (RymArtifact artifact : artifacts)
+        for (RymModule module : modules)
         {
-            String moduleName = String.format("%s.jar", artifact.id.artifact);
+            String moduleName = String.format("%s.jar", module.name);
             Path target = modulesDir.resolve(moduleName);
-            Files.copy(artifact.path, target, StandardCopyOption.REPLACE_EXISTING);
+            // TODO merge multiple paths
+            Files.copy(module.paths.iterator().next(), target, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    private ModuleDescriptor moduleDescriptor(
+        Path archive)
+    {
+        ModuleDescriptor module = null;
+        Set<ModuleReference> moduleRefs = ModuleFinder.of(archive).findAll();
+        if (!moduleRefs.isEmpty())
+        {
+            module = moduleRefs.iterator().next().descriptor();
+        }
+        return module;
     }
 }
