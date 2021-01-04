@@ -119,35 +119,6 @@ public final class RymInstall extends RymCommand
         RymCache cache = new RymCache(config.repositories, cacheDir);
 
         return cache.resolve(config.dependencies);
-
-        /*
-        Map<RymArtifactId, RymArtifact> artifacts = new LinkedHashMap<>();
-        List<RymArtifactId> artifactIds = new LinkedList<>();
-        for (RymDependency dependency : config.dependencies)
-        {
-            artifactIds.add(new RymArtifactId(dependency.groupId, dependency.artifactId, dependency.version));
-        }
-
-        while (!artifactIds.isEmpty())
-        {
-            RymArtifactId artifactId = artifactIds.remove(0);
-            assert !artifacts.containsKey(artifactId);
-
-            RymArtifact artifact = cache.resolve(artifactId);
-            assert artifact != null;
-            artifacts.put(artifactId, artifact);
-
-            for (RymArtifactId depend : artifact.depends)
-            {
-                if (!artifacts.containsKey(depend) && !artifactIds.contains(depend))
-                {
-                    artifactIds.add(depend);
-                }
-            }
-        }
-
-        return artifacts.values();
-        */
     }
 
     private void copyModules(
