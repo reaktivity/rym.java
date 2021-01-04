@@ -15,7 +15,6 @@
  */
 package org.reaktivity.rym.internal.commands.install;
 
-import static java.util.Comparator.reverseOrder;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.not;
@@ -23,9 +22,6 @@ import static org.hamcrest.io.FileMatchers.anExistingFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import org.junit.Test;
 import org.reaktivity.rym.internal.RymCli;
@@ -61,14 +57,6 @@ public class RymInstallTest
             "--silent"
         };
 
-        Path cache = Paths.get("target", "cache");
-        if (Files.exists(cache))
-        {
-            Files.walk(cache)
-                 .sorted(reverseOrder())
-                 .forEach(RymInstallTest::deleteFile);
-        }
-
         Cli<Runnable> parser = new Cli<>(RymCli.class);
         Runnable install = parser.parse(args);
 
@@ -81,18 +69,5 @@ public class RymInstallTest
         assertThat(new File("target/cache/org.reaktivity/nukleus/jars/nukleus-0.51.jar"), anExistingFile());
         assertThat(new File("target/cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
         assertThat(new File("target/cache/org.agrona/agrona/jars/agrona-1.6.0.jar"), anExistingFile());
-    }
-
-    private static void deleteFile(
-        Path file)
-    {
-        try
-        {
-            Files.deleteIfExists(file);
-        }
-        catch (IOException ex)
-        {
-            throw new RuntimeException(ex);
-        }
     }
 }

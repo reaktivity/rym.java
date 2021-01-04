@@ -27,9 +27,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
+import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -72,8 +76,10 @@ public final class RymInstall extends RymCommand
             createDirectories(lockDir);
             builder.toJson(config, newOutputStream(lockFile));
 
-            Collection<RymArtifact> artifacts = resolveDependencies(config);
-            logger.info("resolved dependencies");
+            logger.info("resolving dependencies");
+            createDirectories(cacheDir);
+            RymCache cache = new RymCache(config.repositories, cacheDir);
+            Collection<RymArtifact> artifacts = cache.resolve(config.dependencies);
 
             RymModule unnamed = new RymModule();
             Map<RymArtifactId, RymModule> modules = new LinkedHashMap<>();
@@ -93,7 +99,56 @@ public final class RymInstall extends RymCommand
                 }
             }
 
-            modules.values().forEach(System.out::println);
+            for (RymModule module : modules.values())
+            {
+                for (RymArtifactId depend : module.depends)
+                {
+                    modules.get(depend).refers.add(module.id);
+                }
+            }
+
+            Set<RymArtifactId> automatics = modules.values()
+                    .stream()
+                    .filter(m -> m.automatic)
+                    .map(m -> m.id)
+                    .collect(Collectors.toSet());
+
+            for (RymArtifactId automaticId : automatics)
+            {
+                RymModule automatic = modules.get(automaticId);
+                Set<RymArtifactId> refers = new LinkedHashSet<>();
+                Deque<RymArtifactId> work = new LinkedList<>();
+                automatic.refers.forEach(work::offer);
+                while (!work.isEmpty())
+                {
+                    RymArtifactId id = work.poll();
+                    if (refers.add(id))
+                    {
+                        RymModule module = modules.get(id);
+                        module.refers.forEach(work::offer);
+                    }
+                }
+
+                if (refers.stream().map(modules::get).anyMatch(m -> !m.automatic))
+                {
+                    unnamed.paths.addAll(automatic.paths);
+                    modules.put(automatic.id, new RymModule(automatic));
+                }
+            }
+
+            if (!unnamed.paths.isEmpty())
+            {
+                modules.put(unnamed.id, unnamed);
+            }
+
+            for (RymModule module : modules.values())
+            {
+                System.out.format("%s\n", module.name);
+                for (Path path : module.paths)
+                {
+                    System.out.format("  [%s]\n", path);
+                }
+            }
 
             copyModules(modules.values());
             logger.info("prepared modules");
@@ -111,16 +166,6 @@ public final class RymInstall extends RymCommand
         }
     }
 
-    private Collection<RymArtifact> resolveDependencies(
-        RymConfiguration config) throws IOException
-    {
-        createDirectories(cacheDir);
-
-        RymCache cache = new RymCache(config.repositories, cacheDir);
-
-        return cache.resolve(config.dependencies);
-    }
-
     private void copyModules(
         Collection<RymModule> modules) throws IOException
     {
@@ -130,7 +175,10 @@ public final class RymInstall extends RymCommand
             String moduleName = String.format("%s.jar", module.name);
             Path target = modulesDir.resolve(moduleName);
             // TODO merge multiple paths
-            Files.copy(module.paths.iterator().next(), target, StandardCopyOption.REPLACE_EXISTING);
+            if (!module.paths.isEmpty())
+            {
+                Files.copy(module.paths.iterator().next(), target, StandardCopyOption.REPLACE_EXISTING);
+            }
         }
     }
 

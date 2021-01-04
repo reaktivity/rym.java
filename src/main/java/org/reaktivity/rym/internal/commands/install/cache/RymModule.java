@@ -15,6 +15,7 @@
  */
 package org.reaktivity.rym.internal.commands.install.cache;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 
 import java.lang.module.ModuleDescriptor;
@@ -26,16 +27,20 @@ import java.util.Set;
 public final class RymModule
 {
     public final String name;
+    public final boolean automatic;
     public final Set<Path> paths;
     public final RymArtifactId id;
-    public final boolean automatic;
+    public final Set<RymArtifactId> depends;
+    public final Set<RymArtifactId> refers;
 
     public RymModule()
     {
         this.name = "__unnamed__";
+        this.automatic = false;
         this.paths = new LinkedHashSet<>();
         this.id = null;
-        this.automatic = false;
+        this.depends = emptySet();
+        this.refers = new LinkedHashSet<>();
     }
 
     public RymModule(
@@ -46,12 +51,25 @@ public final class RymModule
         this.automatic = descriptor.isAutomatic();
         this.paths = singleton(artifact.path);
         this.id = artifact.id;
+        this.depends = artifact.depends;
+        this.refers = new LinkedHashSet<>();
+    }
+
+    public RymModule(
+        RymModule module)
+    {
+        this.name = module.name;
+        this.automatic = false;
+        this.paths = emptySet();
+        this.id = module.id;
+        this.depends = emptySet();
+        this.refers = module.refers;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, automatic, paths, id);
+        return Objects.hash(name, automatic, paths, id, depends, refers);
     }
 
     @Override
@@ -72,12 +90,14 @@ public final class RymModule
         return Objects.equals(this.name, that.name) &&
                 Objects.equals(this.paths, that.paths) &&
                 Objects.equals(this.id, that.id) &&
+                Objects.equals(this.depends, that.depends) &&
+                Objects.equals(this.refers, that.refers) &&
                 this.automatic == that.automatic;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s%s -> %s %s", name, automatic ? "+" : "", id, paths);
+        return String.format("%s%s -> %s %s", name, automatic ? "+" : "", depends, paths);
     }
 }
