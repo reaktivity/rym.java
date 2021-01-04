@@ -18,35 +18,29 @@ package org.reaktivity.rym.internal.commands.install;
 import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
-import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.text.ParseException;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
 import javax.json.bind.JsonbConfig;
 
-import org.apache.ivy.Ivy;
-import org.apache.ivy.core.module.id.ArtifactRevisionId;
-import org.apache.ivy.core.module.id.ModuleRevisionId;
-import org.apache.ivy.core.report.ArtifactDownloadReport;
-import org.apache.ivy.core.report.ResolveReport;
-import org.apache.ivy.core.resolve.ResolveOptions;
-import org.apache.ivy.core.settings.IvySettings;
-import org.apache.ivy.plugins.resolver.ChainResolver;
-import org.apache.ivy.plugins.resolver.IBiblioResolver;
-import org.apache.ivy.plugins.resolver.RepositoryResolver;
 import org.apache.ivy.util.DefaultMessageLogger;
 import org.apache.ivy.util.Message;
 import org.apache.ivy.util.MessageLogger;
 import org.reaktivity.rym.internal.RymCommand;
+import org.reaktivity.rym.internal.commands.install.cache.RymArtifact;
+import org.reaktivity.rym.internal.commands.install.cache.RymArtifactId;
+import org.reaktivity.rym.internal.commands.install.cache.RymCache;
+import org.reaktivity.rym.internal.commands.install.cache.RymModule;
 
 import com.github.rvesse.airline.annotations.Command;
 
@@ -76,14 +70,30 @@ public final class RymInstall extends RymCommand
             createDirectories(lockDir);
             builder.toJson(config, newOutputStream(lockFile));
 
-            List<ArtifactDownloadReport> artifacts = resolveDependencies(config);
+            Collection<RymArtifact> artifacts = resolveDependencies(config);
+            logger.info("resolved dependencies");
 
-            if (artifacts != null)
+            Map<String, RymModule> modules = new LinkedHashMap<>();
+            for (RymArtifact artifact : artifacts)
             {
-                logger.info("resolved dependencies");
+                String name = artifact.id.toString(); // TODO
+                boolean automatic = false; // TODO
+                if (name == null)
+                {
+                    RymModule unnamed = modules.computeIfAbsent("", n -> new RymModule());
+                    unnamed.paths.add(artifact.path);
+                }
+                else
+                {
+                    RymModule module = new RymModule(name, artifact.path, automatic);
+                    modules.put(name, module);
+                }
             }
 
+            //modules.values().forEach(System.out::println);
+
             copyModules(artifacts);
+            logger.info("prepared modules");
         }
         catch (Exception ex)
         {
@@ -98,79 +108,52 @@ public final class RymInstall extends RymCommand
         }
     }
 
-    private void copyModules(
-        List<ArtifactDownloadReport> artifacts) throws IOException
+    private Collection<RymArtifact> resolveDependencies(
+        RymConfiguration config) throws IOException
     {
-        Files.createDirectories(modulesDir);
-        for (ArtifactDownloadReport artifact : artifacts)
-        {
-            ArtifactRevisionId id = artifact.getArtifact().getId();
-            File localFile = artifact.getLocalFile();
-            String moduleName = String.format("%s.jar", id.getArtifactId().getName());
-            Path target = modulesDir.resolve(moduleName);
-            Files.copy(localFile.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    private RepositoryResolver newResolver(
-        RymRepository repository)
-    {
-        String name = "maven"; // TODO
-        String root = repository.location;
-
-        IBiblioResolver resolver = new IBiblioResolver();
-        resolver.setName(name);
-        resolver.setRoot(root);
-        resolver.setM2compatible(true);
-
-        return resolver;
-    }
-
-    private List<ArtifactDownloadReport> resolveDependencies(
-        RymConfiguration config) throws ParseException, IOException
-    {
-        ResolveOptions options = new ResolveOptions();
-        options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
-        options.setArtifactFilter(getArtifactTypeFilter("jar"));
-        options.setConfs("master,runtime".split(","));
-        options.setRefresh(true);
-        options.setOutputReport(false);
-
-        ChainResolver chain = new ChainResolver();
-        chain.setName("default");
-
-        config.getRepositories().stream().map(this::newResolver).forEach(chain::add);
-
         createDirectories(cacheDir);
 
-        IvySettings ivySettings = new IvySettings();
-        ivySettings.setDefaultCache(cacheDir.toFile());
-        ivySettings.addConfigured(chain);
-        ivySettings.setDefaultResolver(chain.getName());
+        RymCache cache = new RymCache(config.repositories, cacheDir);
 
-        Ivy ivy = Ivy.newInstance(ivySettings);
+        cache.clean();
 
-        List<ArtifactDownloadReport> artifacts = new LinkedList<>();
-        for (RymDependency dependency : config.getDependencies())
+        Map<RymArtifactId, RymArtifact> artifacts = new LinkedHashMap<>();
+        List<RymArtifactId> artifactIds = new LinkedList<>();
+        for (RymDependency dependency : config.dependencies)
         {
-            String groupId = dependency.groupId;
-            String artifactId = dependency.artifactId;
-            String version = dependency.version;
+            artifactIds.add(new RymArtifactId(dependency.groupId, dependency.artifactId, dependency.version));
+        }
 
-            ModuleRevisionId reference = ModuleRevisionId.newInstance(groupId, artifactId, version);
+        while (!artifactIds.isEmpty())
+        {
+            RymArtifactId artifactId = artifactIds.remove(0);
+            assert !artifacts.containsKey(artifactId);
 
-            ResolveReport report = ivy.resolve(reference, options, false);
-            if (report.hasError())
+            RymArtifact artifact = cache.resolve(artifactId);
+            assert artifact != null;
+            artifacts.put(artifactId, artifact);
+
+            for (RymArtifactId depend : artifact.depends)
             {
-                artifacts = null;
-                break;
-            }
-
-            for (ArtifactDownloadReport artifact : report.getAllArtifactsReports())
-            {
-                artifacts.add(artifact);
+                if (!artifacts.containsKey(depend) && !artifactIds.contains(depend))
+                {
+                    artifactIds.add(depend);
+                }
             }
         }
-        return artifacts;
+
+        return artifacts.values();
+    }
+
+    private void copyModules(
+        Collection<RymArtifact> artifacts) throws IOException
+    {
+        Files.createDirectories(modulesDir);
+        for (RymArtifact artifact : artifacts)
+        {
+            String moduleName = String.format("%s.jar", artifact.id.artifact);
+            Path target = modulesDir.resolve(moduleName);
+            Files.copy(artifact.path, target, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }
