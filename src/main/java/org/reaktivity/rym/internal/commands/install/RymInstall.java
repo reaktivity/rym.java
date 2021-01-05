@@ -15,25 +15,35 @@
  */
 package org.reaktivity.rym.internal.commands.install;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.lang.module.ModuleDescriptor;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.Deque;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+import java.util.spi.ToolProvider;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -81,7 +91,7 @@ public final class RymInstall extends RymCommand
             RymCache cache = new RymCache(config.repositories, cacheDir);
             Collection<RymArtifact> artifacts = cache.resolve(config.dependencies);
 
-            RymModule unnamed = new RymModule();
+            RymModule delegate = new RymModule();
             Map<RymArtifactId, RymModule> modules = new LinkedHashMap<>();
             for (RymArtifact artifact : artifacts)
             {
@@ -89,68 +99,27 @@ public final class RymInstall extends RymCommand
 
                 if (descriptor == null)
                 {
-                    unnamed.paths.add(artifact.path);
-                    modules.put(artifact.id, unnamed);
+                    delegate.paths.add(artifact.path);
+                    modules.put(artifact.id, delegate);
                 }
                 else
                 {
                     RymModule module = new RymModule(descriptor, artifact);
-                    modules.put(artifact.id, module);
-                }
-            }
-
-            for (RymModule module : modules.values())
-            {
-                for (RymArtifactId depend : module.depends)
-                {
-                    modules.get(depend).refers.add(module.id);
-                }
-            }
-
-            Set<RymArtifactId> automatics = modules.values()
-                    .stream()
-                    .filter(m -> m.automatic)
-                    .map(m -> m.id)
-                    .collect(Collectors.toSet());
-
-            for (RymArtifactId automaticId : automatics)
-            {
-                RymModule automatic = modules.get(automaticId);
-                Set<RymArtifactId> refers = new LinkedHashSet<>();
-                Deque<RymArtifactId> work = new LinkedList<>();
-                automatic.refers.forEach(work::offer);
-                while (!work.isEmpty())
-                {
-                    RymArtifactId id = work.poll();
-                    if (refers.add(id))
+                    if (module.automatic)
                     {
-                        RymModule module = modules.get(id);
-                        module.refers.forEach(work::offer);
+                        delegate.paths.addAll(module.paths);
+                        modules.put(module.id, new RymModule(module));
+                    }
+                    else
+                    {
+                        modules.put(module.id, module);
                     }
                 }
-
-                if (refers.stream().map(modules::get).anyMatch(m -> !m.automatic))
-                {
-                    unnamed.paths.addAll(automatic.paths);
-                    modules.put(automatic.id, new RymModule(automatic));
-                }
             }
 
-            if (!unnamed.paths.isEmpty())
-            {
-                modules.put(unnamed.id, unnamed);
-            }
-
-            for (RymModule module : modules.values())
-            {
-                System.out.format("%s\n", module.name);
-                for (Path path : module.paths)
-                {
-                    System.out.format("  [%s]\n", path);
-                }
-            }
-
-            copyModules(modules.values());
+            createDirectories(modulesDir);
+            prepareDelegateModule(logger, delegate);
+            prepareModules(logger, modules);
             logger.info("prepared modules");
         }
         catch (Exception ex)
@@ -166,18 +135,192 @@ public final class RymInstall extends RymCommand
         }
     }
 
-    private void copyModules(
-        Collection<RymModule> modules) throws IOException
+    private void prepareDelegateModule(
+        MessageLogger logger,
+        RymModule delegate) throws IOException
     {
-        Files.createDirectories(modulesDir);
-        for (RymModule module : modules)
+        Path modulePath = modulesDir.resolve(String.format("%s.jar", delegate.name));
+        try (JarOutputStream moduleJar = new JarOutputStream(Files.newOutputStream(modulePath)))
         {
-            String moduleName = String.format("%s.jar", module.name);
-            Path target = modulesDir.resolve(moduleName);
-            // TODO merge multiple paths
-            if (!module.paths.isEmpty())
+            Path manifestPath = Paths.get("META-INF", "MANIFEST.MF");
+            Path servicesPath = Paths.get("META-INF", "services");
+            Set<String> entryNames = new HashSet<>();
+            Map<String, String> services = new HashMap<>();
+            for (Path path : delegate.paths)
             {
-                Files.copy(module.paths.iterator().next(), target, StandardCopyOption.REPLACE_EXISTING);
+                try (JarFile artifactJar = new JarFile(path.toFile()))
+                {
+                    for (JarEntry entry : Collections.list(artifactJar.entries()))
+                    {
+                        String entryName = entry.getName();
+                        Path entryPath = Paths.get(entryName);
+                        if (entryPath.equals(manifestPath))
+                        {
+                            continue;
+                        }
+
+                        try (InputStream input = artifactJar.getInputStream(entry))
+                        {
+                            if (entryPath.startsWith(servicesPath) && entryPath.getNameCount() == servicesPath.getNameCount() + 1)
+                            {
+                                Path servicePath = servicesPath.relativize(entryPath);
+                                assert servicePath.getNameCount() == 1;
+                                String serviceName = servicePath.toString();
+                                String serviceImpl = new String(input.readAllBytes(), UTF_8);
+                                String existing = services.getOrDefault(serviceName, "");
+                                services.put(serviceName, existing.concat(serviceImpl));
+                            }
+                            else if (entryNames.add(entryName))
+                            {
+                                moduleJar.putNextEntry(entry);
+                                moduleJar.write(input.readAllBytes());
+                                moduleJar.closeEntry();
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (Map.Entry<String, String> service : services.entrySet())
+            {
+                JarEntry newEntry = new JarEntry(servicesPath.resolve(service.getKey()).toString());
+                newEntry.setTime(318240000000L);
+                moduleJar.putNextEntry(newEntry);
+                moduleJar.write(service.getValue().getBytes(UTF_8));
+                moduleJar.closeEntry();
+            }
+        }
+
+        Path moduleGenDir = tempDir.resolve(String.format("%s-src", delegate.name));
+        Path moduleDir = tempDir.resolve(delegate.name);
+        ToolProvider jdeps = ToolProvider.findFirst("jdeps").get();
+        jdeps.run(
+            System.out,
+            System.err,
+            "--generate-module-info", moduleGenDir.toString(),
+            modulePath.toString());
+
+        try (JarFile jar = new JarFile(modulePath.toFile()))
+        {
+            for (JarEntry entry : Collections.list(jar.entries()))
+            {
+                try (InputStream input = jar.getInputStream(entry))
+                {
+                    Path entryPath = moduleDir.resolve(entry.getName());
+                    if (entry.isDirectory())
+                    {
+                        createDirectories(entryPath);
+                    }
+                    else
+                    {
+                        Files.write(entryPath, input.readAllBytes());
+                    }
+                }
+            }
+        }
+
+        Path moduleInfo = moduleGenDir.resolve(delegate.name).resolve("module-info.java");
+        ToolProvider javac = ToolProvider.findFirst("javac").get();
+        OutputStream out = new ByteArrayOutputStream();
+        int result = javac.run(
+                new PrintStream(out),
+                System.err,
+                "-d", moduleDir.toString(),
+                moduleInfo.toString());
+        if (result != 0)
+        {
+            logger.error(out.toString());
+        }
+
+        Path moduleTempPath = modulePath.resolveSibling(String.format("%s.tmp.jar", delegate.name));
+        Files.move(modulePath, moduleTempPath);
+        try (JarFile tempJar = new JarFile(moduleTempPath.toFile());
+             JarOutputStream moduleJar = new JarOutputStream(Files.newOutputStream(modulePath)))
+        {
+            for (JarEntry entry : Collections.list(tempJar.entries()))
+            {
+                moduleJar.putNextEntry(entry);
+                try (InputStream input = tempJar.getInputStream(entry))
+                {
+                    moduleJar.write(input.readAllBytes());
+                }
+                moduleJar.closeEntry();
+            }
+
+            JarEntry newEntry = new JarEntry("module-info.class");
+            newEntry.setTime(318240000000L);
+            moduleJar.putNextEntry(newEntry);
+            moduleJar.write(Files.readAllBytes(moduleDir.resolve("module-info.class")));
+            moduleJar.closeEntry();
+        }
+        Files.delete(moduleTempPath);
+    }
+
+    private void prepareModules(
+        MessageLogger logger,
+        Map<RymArtifactId, RymModule> modules) throws IOException
+    {
+        for (RymModule module : modules.values())
+        {
+            System.out.format("%s\n", module.name);
+            if (module.paths.isEmpty())
+            {
+                System.out.format("  %s\n", RymModule.DELEGATE_NAME);
+            }
+            else
+            {
+                for (Path path : module.paths)
+                {
+                    System.out.format("  [%s]\n", path);
+                }
+                for (RymArtifactId dependId : module.depends)
+                {
+                    RymModule depend = modules.get(dependId);
+                    System.out.format("  %s\n", depend.name);
+                }
+            }
+
+            Path modulePath = modulesDir.resolve(String.format("%s.jar", module.name));
+            if (module.paths.isEmpty())
+            {
+                Path moduleGenDir = tempDir.resolve(String.format("%s-src", module.name));
+                Path moduleDir = tempDir.resolve(module.name);
+                Files.createDirectories(moduleGenDir);
+                Path moduleInfo = moduleGenDir.resolve("module-info.java");
+                Files.write(moduleInfo, Arrays.asList(
+                        String.format("open module %s {", module.name),
+                        String.format("    requires transitive %s;", RymModule.DELEGATE_NAME),
+                        "}"));
+                ToolProvider javac = ToolProvider.findFirst("javac").get();
+                OutputStream out = new ByteArrayOutputStream();
+                int result = javac.run(
+                        new PrintStream(out),
+                        System.err,
+                        "-d", moduleDir.toString(),
+                        "--module-path", modulesDir.toString(),
+                        moduleInfo.toString());
+                if (result != 0)
+                {
+                    logger.error(out.toString());
+                }
+
+                try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(modulePath)))
+                {
+                    JarEntry newEntry = new JarEntry("module-info.class");
+                    newEntry.setTime(318240000000L);
+                    jar.putNextEntry(newEntry);
+                    jar.write(Files.readAllBytes(moduleDir.resolve("module-info.class")));
+                    jar.closeEntry();
+                }
+            }
+            else if (module.paths.size() == 1)
+            {
+                Path artifactPath = module.paths.iterator().next();
+                Files.copy(artifactPath, modulePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            else
+            {
+                // TODO: generate merged delegate module
             }
         }
     }

@@ -26,21 +26,22 @@ import java.util.Set;
 
 public final class RymModule
 {
+    public static final String DELEGATE_NAME = "delegate";
+    public static final RymArtifactId DELEGATE_ID = null;
+
     public final String name;
     public final boolean automatic;
     public final Set<Path> paths;
     public final RymArtifactId id;
     public final Set<RymArtifactId> depends;
-    public final Set<RymArtifactId> refers;
 
     public RymModule()
     {
-        this.name = "__unnamed__";
+        this.name = DELEGATE_NAME;
         this.automatic = false;
         this.paths = new LinkedHashSet<>();
-        this.id = null;
+        this.id = DELEGATE_ID;
         this.depends = emptySet();
-        this.refers = new LinkedHashSet<>();
     }
 
     public RymModule(
@@ -52,7 +53,6 @@ public final class RymModule
         this.paths = singleton(artifact.path);
         this.id = artifact.id;
         this.depends = artifact.depends;
-        this.refers = new LinkedHashSet<>();
     }
 
     public RymModule(
@@ -63,13 +63,12 @@ public final class RymModule
         this.paths = emptySet();
         this.id = module.id;
         this.depends = emptySet();
-        this.refers = module.refers;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, automatic, paths, id, depends, refers);
+        return Objects.hash(name, automatic, paths, id, depends);
     }
 
     @Override
@@ -91,7 +90,6 @@ public final class RymModule
                 Objects.equals(this.paths, that.paths) &&
                 Objects.equals(this.id, that.id) &&
                 Objects.equals(this.depends, that.depends) &&
-                Objects.equals(this.refers, that.refers) &&
                 this.automatic == that.automatic;
     }
 
