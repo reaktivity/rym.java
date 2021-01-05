@@ -54,6 +54,7 @@ public class RymInstallTest
             "--config-directory", "src/test/conf/install",
             "--lock-directory", "target/test-locks/install",
             "--output-directory", "target",
+            "--launcher-directory", "target",
             "--silent"
         };
 

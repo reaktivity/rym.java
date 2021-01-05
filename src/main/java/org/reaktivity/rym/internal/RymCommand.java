@@ -50,8 +50,14 @@ public abstract class RymCommand implements Runnable
             hidden = true)
     public Path lockDir;
 
+    @Option(name = { "--launcher-directory" },
+            description = "launcher directory",
+            typeConverterProvider = RymPathConverterProvider.class)
+    public Path launcherDir = Paths.get("");
+
     protected Path cacheDir;
     protected Path modulesDir;
+    protected Path imageDir;
     protected Path tempDir;
 
     @Override
@@ -67,6 +73,7 @@ public abstract class RymCommand implements Runnable
             cacheDir = outputDir.resolve("cache");
             modulesDir = outputDir.resolve("modules");
             tempDir = outputDir.resolve("temp");
+            imageDir = outputDir.resolve("image");
 
             invoke();
         }

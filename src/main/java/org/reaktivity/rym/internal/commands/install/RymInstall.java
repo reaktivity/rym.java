@@ -44,6 +44,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.spi.ToolProvider;
+import java.util.stream.Collectors;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -120,7 +121,11 @@ public final class RymInstall extends RymCommand
             createDirectories(modulesDir);
             prepareDelegateModule(logger, delegate);
             prepareModules(logger, modules);
+            linkModules(logger, modules.values());
             logger.info("prepared modules");
+
+            generateLauncher();
+            logger.info("generated launcher");
         }
         catch (Exception ex)
         {
@@ -262,24 +267,6 @@ public final class RymInstall extends RymCommand
     {
         for (RymModule module : modules.values())
         {
-            System.out.format("%s\n", module.name);
-            if (module.paths.isEmpty())
-            {
-                System.out.format("  %s\n", RymModule.DELEGATE_NAME);
-            }
-            else
-            {
-                for (Path path : module.paths)
-                {
-                    System.out.format("  [%s]\n", path);
-                }
-                for (RymArtifactId dependId : module.depends)
-                {
-                    RymModule depend = modules.get(dependId);
-                    System.out.format("  %s\n", depend.name);
-                }
-            }
-
             Path modulePath = modulesDir.resolve(String.format("%s.jar", module.name));
             if (module.paths.isEmpty())
             {
@@ -313,16 +300,45 @@ public final class RymInstall extends RymCommand
                     jar.closeEntry();
                 }
             }
-            else if (module.paths.size() == 1)
+            else
             {
+                assert module.paths.size() == 1;
                 Path artifactPath = module.paths.iterator().next();
                 Files.copy(artifactPath, modulePath, StandardCopyOption.REPLACE_EXISTING);
             }
-            else
-            {
-                // TODO: generate merged delegate module
-            }
         }
+    }
+
+    private void linkModules(
+        MessageLogger logger,
+        Collection<RymModule> modules) throws IOException
+    {
+        String javaHome = System.getProperty("java.home");
+        ToolProvider jlink = ToolProvider.findFirst("jlink").get();
+        jlink.run(
+            System.out,
+            System.err,
+            "--module-path", String.format("%s:%s/jmods", modulesDir, javaHome),
+            "--output", imageDir.toString(),
+            "--no-header-files",
+            "--no-man-pages",
+            "--strip-debug",
+            "--compress", "2",
+            "--add-modules", modules.stream().map(m -> m.name).collect(Collectors.joining(",")));
+    }
+
+    private void generateLauncher() throws IOException
+    {
+        Path ryPath = launcherDir.resolve("ry");
+        Files.write(ryPath, Arrays.asList(
+                "#!/bin/sh",
+                "JLINK_VM_OPTIONS=",
+                String.format(
+                    "%s/bin/java " +
+                    "$JLINK_VM_OPTIONS " +
+                    "-m org.reaktivity.ry/org.reaktivity.ry.internal.RyMain \"$@\"",
+                    imageDir)));
+        ryPath.toFile().setExecutable(true);
     }
 
     private ModuleDescriptor moduleDescriptor(
