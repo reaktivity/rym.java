@@ -315,6 +315,8 @@ public final class RymInstall extends RymCommand
             Path moduleInfoPath = Paths.get(MODULE_INFO_CLASS_FILENAME);
             Path manifestPath = Paths.get("META-INF", "MANIFEST.MF");
             Path servicesPath = Paths.get("META-INF", "services");
+            Path excludedPackage = Paths.get("org", "eclipse", "yasson", "internal", "components");
+            String excludedClass = "BeanManagerInstanceCreator";
             Set<String> entryNames = new HashSet<>();
             Map<String, String> services = new HashMap<>();
             for (Path path : delegate.paths)
@@ -326,7 +328,9 @@ public final class RymInstall extends RymCommand
                         String entryName = entry.getName();
                         Path entryPath = Paths.get(entryName);
                         if (entryPath.equals(moduleInfoPath) ||
-                            entryPath.equals(manifestPath))
+                            entryPath.equals(manifestPath) ||
+                            (entryPath.startsWith(excludedPackage)) &&
+                             entryPath.getFileName().toString().startsWith(excludedClass))
                         {
                             continue;
                         }
@@ -517,6 +521,12 @@ public final class RymInstall extends RymCommand
                 }
                 else
                 {
+                    Path parentPath = entryPath.getParent();
+                    if (!Files.exists(parentPath))
+                    {
+                        createDirectories(parentPath);
+                    }
+
                     try (InputStream input = sourceJar.getInputStream(entry))
                     {
                         Files.write(entryPath, input.readAllBytes());
