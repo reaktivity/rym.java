@@ -456,13 +456,12 @@ public final class RymInstall extends RymCommand
         MessageLogger logger,
         Collection<RymModule> modules) throws IOException
     {
-        String javaHome = System.getProperty("java.home");
         ToolProvider jlink = ToolProvider.findFirst("jlink").get();
         jlink.run(
             System.out,
             System.err,
             "--verbose",
-            "--module-path", String.format("%s:%s/jmods", modulesDir, javaHome),
+            "--module-path", modulesDir.toString(),
             "--output", imageDir.toString(),
             "--no-header-files",
             "--no-man-pages",
