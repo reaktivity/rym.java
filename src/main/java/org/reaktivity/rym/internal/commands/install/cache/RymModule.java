@@ -113,6 +113,6 @@ public final class RymModule
     @Override
     public String toString()
     {
-        return String.format("%s%s -> %s %s", name, delegating ? "+" : "", depends, paths);
+        return String.format("%s%s%s -> %s %s", name, automatic ? "@" : "", delegating ? "+" : "", depends, paths);
     }
 }
