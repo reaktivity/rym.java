@@ -81,9 +81,16 @@ public final class RymInstall extends RymCommand
         MessageLogger logger = new DefaultMessageLogger(level);
         Message.setDefaultLogger(logger);
 
+        task:
         try
         {
             Path depsFile = configDir.resolve("ry.deps");
+            if (!Files.exists(depsFile))
+            {
+                logger.error(String.format("missing %s", depsFile));
+                break task;
+            }
+
             logger.info(String.format("reading %s", depsFile));
             Jsonb builder = JsonbBuilder.newBuilder()
                                         .withConfig(new JsonbConfig().withFormatting(true))
@@ -122,6 +129,7 @@ public final class RymInstall extends RymCommand
         catch (Exception ex)
         {
             logger.error(String.format("Error: %s", ex.getMessage()));
+            throw new RuntimeException(ex);
         }
         finally
         {
