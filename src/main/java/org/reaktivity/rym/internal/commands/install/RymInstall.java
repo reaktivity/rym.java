@@ -371,9 +371,18 @@ public final class RymInstall extends RymCommand
             "--generate-module-info", generatedModulesDir.toString(),
             generatedDelegatePath.toString());
 
+        Path generatedModuleInfo = generatedDelegateDir.resolve(MODULE_INFO_JAVA_FILENAME);
+        assert Files.exists(generatedModuleInfo);
+
+        String moduleInfoContents = Files.readString(generatedModuleInfo);
+        moduleInfoContents = moduleInfoContents.replace(
+            "}",
+            "uses org.reaktivity.nukleus.ControllerFactorySpi;\n" +
+            "uses org.reaktivity.nukleus.NukleusFactorySpi;\n}");
+        Files.writeString(generatedModuleInfo, moduleInfoContents);
+
         expandJar(generatedDelegateDir, generatedDelegatePath);
 
-        Path generatedModuleInfo = generatedDelegateDir.resolve(MODULE_INFO_JAVA_FILENAME);
         ToolProvider javac = ToolProvider.findFirst("javac").get();
         javac.run(
                 System.out,
