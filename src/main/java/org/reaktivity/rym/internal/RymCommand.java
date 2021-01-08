@@ -58,7 +58,7 @@ public abstract class RymCommand implements Runnable
     protected Path cacheDir;
     protected Path modulesDir;
     protected Path imageDir;
-    protected Path tempDir;
+    protected Path generatedDir;
 
     @Override
     public void run()
@@ -72,7 +72,7 @@ public abstract class RymCommand implements Runnable
 
             cacheDir = outputDir.resolve("cache");
             modulesDir = outputDir.resolve("modules");
-            tempDir = outputDir.resolve("temp");
+            generatedDir = outputDir.resolve("generated");
             imageDir = outputDir.resolve("image");
 
             invoke();

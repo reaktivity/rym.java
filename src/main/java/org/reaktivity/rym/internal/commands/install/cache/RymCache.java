@@ -53,7 +53,7 @@ public final class RymCache
     {
         ResolveOptions options = new ResolveOptions();
         options.setLog(ResolveOptions.LOG_DOWNLOAD_ONLY);
-        options.setArtifactFilter(getArtifactTypeFilter("jar"));
+        options.setArtifactFilter(getArtifactTypeFilter(new String[]{"jar", "bundle"}));
         options.setConfs("master,runtime".split(","));
         options.setRefresh(true);
         options.setOutputReport(false);
@@ -110,28 +110,34 @@ public final class RymCache
             for (IvyNode node : report.getDependencies())
             {
                 ModuleDescriptor descriptor = node.getDescriptor();
+                if (descriptor == null)
+                {
+                    continue;
+                }
+
                 ModuleRevisionId resolveId = descriptor.getModuleRevisionId();
                 ArtifactDownloadReport[] downloads = report.getArtifactsReports(resolveId);
-
-                if (downloads.length != 0)
+                if (downloads.length == 0)
                 {
-                    Set<RymArtifactId> depends = new LinkedHashSet<>();
-                    for (DependencyDescriptor dd : descriptor.getDependencies())
-                    {
-                        ModuleRevisionId dependId = dd.getDependencyRevisionId();
-                        ArtifactDownloadReport[] dependDownloads = report.getArtifactsReports(dependId);
-                        if (dependDownloads.length != 0)
-                        {
-                            RymArtifactId depend = newArtifactId(dependId);
-                            depends.add(depend);
-                        }
-                    }
-
-                    RymArtifactId id = newArtifactId(resolveId);
-                    Path local = downloads[0].getLocalFile().toPath();
-                    RymArtifact artifact = new RymArtifact(id, local, depends);
-                    artifacts.add(artifact);
+                    continue;
                 }
+
+                Set<RymArtifactId> depends = new LinkedHashSet<>();
+                for (DependencyDescriptor dd : descriptor.getDependencies())
+                {
+                    ModuleRevisionId dependId = dd.getDependencyRevisionId();
+                    ArtifactDownloadReport[] dependDownloads = report.getArtifactsReports(dependId);
+                    if (dependDownloads.length != 0)
+                    {
+                        RymArtifactId depend = newArtifactId(dependId);
+                        depends.add(depend);
+                    }
+                }
+
+                RymArtifactId id = newArtifactId(resolveId);
+                Path local = downloads[0].getLocalFile().toPath();
+                RymArtifact artifact = new RymArtifact(id, local, depends);
+                artifacts.add(artifact);
             }
         }
         catch (Exception ex)

@@ -26,7 +26,7 @@ import java.util.Set;
 
 public final class RymModule
 {
-    public static final String DELEGATE_NAME = "delegate";
+    public static final String DELEGATE_NAME = "org.reaktivity.rym.delegate";
     public static final RymArtifactId DELEGATE_ID = null;
 
     public final String name;
@@ -35,6 +35,8 @@ public final class RymModule
     public final RymArtifactId id;
     public final Set<RymArtifactId> depends;
 
+    public boolean delegating;
+
     public RymModule()
     {
         this.name = DELEGATE_NAME;
@@ -42,6 +44,18 @@ public final class RymModule
         this.paths = new LinkedHashSet<>();
         this.id = DELEGATE_ID;
         this.depends = emptySet();
+        this.delegating = false;
+    }
+
+    public RymModule(
+        RymArtifact artifact)
+    {
+        this.name = null;
+        this.automatic = false;
+        this.paths = new LinkedHashSet<>(singleton(artifact.path));
+        this.id = artifact.id;
+        this.depends = artifact.depends;
+        this.delegating = true;
     }
 
     public RymModule(
@@ -50,9 +64,10 @@ public final class RymModule
     {
         this.name = descriptor.name();
         this.automatic = descriptor.isAutomatic();
-        this.paths = singleton(artifact.path);
+        this.paths = new LinkedHashSet<>(singleton(artifact.path));
         this.id = artifact.id;
         this.depends = artifact.depends;
+        this.delegating = false;
     }
 
     public RymModule(
@@ -63,12 +78,13 @@ public final class RymModule
         this.paths = emptySet();
         this.id = module.id;
         this.depends = emptySet();
+        this.delegating = false;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, automatic, paths, id, depends);
+        return Objects.hash(name, automatic, paths, id, depends, delegating);
     }
 
     @Override
@@ -90,12 +106,13 @@ public final class RymModule
                 Objects.equals(this.paths, that.paths) &&
                 Objects.equals(this.id, that.id) &&
                 Objects.equals(this.depends, that.depends) &&
-                this.automatic == that.automatic;
+                this.automatic == that.automatic &&
+                this.delegating == that.delegating;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s%s -> %s %s", name, automatic ? "+" : "", depends, paths);
+        return String.format("%s%s -> %s %s", name, delegating ? "+" : "", depends, paths);
     }
 }
