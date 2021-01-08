@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,12 +43,15 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.spi.ToolProvider;
 import java.util.stream.Collectors;
 
@@ -375,11 +379,22 @@ public final class RymInstall extends RymCommand
         assert Files.exists(generatedModuleInfo);
 
         String moduleInfoContents = Files.readString(generatedModuleInfo);
-        moduleInfoContents = moduleInfoContents.replace(
-            "}",
-            "uses org.reaktivity.nukleus.ControllerFactorySpi;\n" +
-            "uses org.reaktivity.nukleus.NukleusFactorySpi;\n}");
-        Files.writeString(generatedModuleInfo, moduleInfoContents);
+        Pattern pattern = Pattern.compile("(?:provides\\s+)([^\\s]+)(?:\\s+with)");
+        Matcher matcher = pattern.matcher(moduleInfoContents);
+        List<String> uses = new ArrayList<>();
+        while (matcher.find())
+        {
+            String service = matcher.group(1);
+            uses.add(String.format("uses %s;", service));
+        }
+
+        if (!uses.isEmpty())
+        {
+            Files.writeString(generatedModuleInfo,
+                    moduleInfoContents.replace(
+                            "}",
+                            String.join("\n", uses) + "\n}"));
+        }
 
         expandJar(generatedDelegateDir, generatedDelegatePath);
 
@@ -443,8 +458,9 @@ public final class RymInstall extends RymCommand
     {
         String javaHome = System.getProperty("java.home");
         ToolProvider jlink = ToolProvider.findFirst("jlink").get();
-        String[] args = new String[]
-        {
+        jlink.run(
+            System.out,
+            System.err,
             "--verbose",
             "--module-path", String.format("%s:%s/jmods", modulesDir, javaHome),
             "--output", imageDir.toString(),
@@ -452,15 +468,7 @@ public final class RymInstall extends RymCommand
             "--no-man-pages",
             "--strip-debug",
             "--compress", "2",
-            "--add-modules", modules.stream().map(m -> m.name).collect(Collectors.joining(","))
-        };
-
-        System.out.println(Arrays.asList(args).stream().collect(Collectors.joining(" ")));
-
-        jlink.run(
-            System.out,
-            System.err,
-            args);
+            "--add-modules", modules.stream().map(m -> m.name).collect(Collectors.joining(",")));
     }
 
     private void generateLauncher() throws IOException
