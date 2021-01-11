@@ -66,9 +66,9 @@ public class RymInstallTest
         assertThat(install, instanceOf(RymInstall.class));
         assertThat(new File("src/test/conf/install/ry.deps"), anExistingFile());
         assertThat(new File("target/test-locks/install/ry.deps.lock"), anExistingFile());
-        assertThat(new File("target/cache/org.reaktivity/reaktor/jars/reaktor-0.153.jar"), anExistingFile());
-        assertThat(new File("target/cache/org.reaktivity/nukleus/jars/nukleus-0.51.jar"), anExistingFile());
-        assertThat(new File("target/cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
-        assertThat(new File("target/cache/org.agrona/agrona/jars/agrona-1.6.0.jar"), anExistingFile());
+        assertThat(new File("target/rym/cache/org.reaktivity/reaktor/jars/reaktor-0.153.jar"), anExistingFile());
+        assertThat(new File("target/rym/cache/org.reaktivity/nukleus/jars/nukleus-0.51.jar"), anExistingFile());
+        assertThat(new File("target/rym/cache/org.reaktivity/nukleus-echo/jars/nukleus-echo-0.18.jar"), anExistingFile());
+        assertThat(new File("target/rym/cache/org.agrona/agrona/jars/agrona-1.6.0.jar"), anExistingFile());
     }
 }
