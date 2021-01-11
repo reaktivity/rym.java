@@ -13,27 +13,28 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.rym.internal;
+package org.reaktivity.rym.internal.commands.clean;
 
-import org.reaktivity.rym.internal.commands.clean.RymClean;
-import org.reaktivity.rym.internal.commands.install.RymInstall;
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
 
-import com.github.rvesse.airline.annotations.Cli;
-import com.github.rvesse.airline.help.Help;
+import org.junit.Test;
+import org.reaktivity.rym.internal.RymCli;
 
-@Cli(name = "rym",
-    description = "Reaktivity Management Tool",
-    defaultCommand = Help.class,
-    commands =
-    {
-        Help.class,
-        RymInstall.class,
-        RymClean.class
-    })
-public final class RymCli
+import com.github.rvesse.airline.Cli;
+
+public class RymCleanTest
 {
-    private RymCli()
+    @Test
+    public void shouldCleanup()
     {
-        // utility class
+        String[] args = { "clean", "--output-directory", "target/rym" };
+
+        Cli<Runnable> parser = new Cli<>(RymCli.class);
+        Runnable clean = parser.parse(args);
+
+        clean.run();
+
+        assertThat(clean, instanceOf(RymClean.class));
     }
 }
