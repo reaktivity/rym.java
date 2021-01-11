@@ -20,19 +20,6 @@ import java.util.List;
 public final class RymConfiguration
 {
     public List<RymDependency> dependencies;
+    public List<RymDependency> imports;
     public List<RymRepository> repositories;
-
-    public RymConfiguration()
-    {
-    }
-
-    public List<RymDependency> getDependencies()
-    {
-        return dependencies;
-    }
-
-    public List<RymRepository> getRepositories()
-    {
-        return repositories;
-    }
 }

@@ -45,7 +45,7 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getDependencies(), nullValue());
+        assertThat(config.dependencies, nullValue());
     }
 
     @Test
@@ -77,8 +77,8 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getRepositories(), not(nullValue()));
-        assertThat(config.getRepositories(), emptyCollectionOf(RymRepository.class));
+        assertThat(config.repositories, not(nullValue()));
+        assertThat(config.repositories, emptyCollectionOf(RymRepository.class));
     }
 
     @Test
@@ -115,8 +115,8 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getRepositories(), not(nullValue()));
-        assertThat(config.getRepositories(), equalTo(singletonList(new RymRepository("https://repo1.maven.org/maven2/"))));
+        assertThat(config.repositories, not(nullValue()));
+        assertThat(config.repositories, equalTo(singletonList(new RymRepository("https://repo1.maven.org/maven2/"))));
     }
 
     @Test
@@ -156,8 +156,8 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getRepositories(), not(nullValue()));
-        assertThat(config.getRepositories(), equalTo(asList(new RymRepository("https://maven.example.com/maven2/"),
+        assertThat(config.repositories, not(nullValue()));
+        assertThat(config.repositories, equalTo(asList(new RymRepository("https://maven.example.com/maven2/"),
                 new RymRepository("https://repo1.maven.org/maven2/"))));
     }
 
@@ -198,8 +198,8 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getDependencies(), not(nullValue()));
-        assertThat(config.getDependencies(), emptyCollectionOf(RymDependency.class));
+        assertThat(config.dependencies, not(nullValue()));
+        assertThat(config.dependencies, emptyCollectionOf(RymDependency.class));
     }
 
     @Test
@@ -228,7 +228,7 @@ public class RymConfigurationTest
                 "{" +
                     "\"dependencies\":" +
                     "[" +
-                        "\"reaktor:1.0.0\"" +
+                        "\"org.reaktivity:reaktor:1.0.0\"" +
                     "]" +
                 "}";
 
@@ -236,7 +236,7 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getDependencies(), equalTo(singletonList(new RymDependency("org.reaktivity", "reaktor", "1.0.0"))));
+        assertThat(config.dependencies, equalTo(singletonList(new RymDependency("org.reaktivity", "reaktor", "1.0.0"))));
     }
 
     @Test
@@ -267,7 +267,7 @@ public class RymConfigurationTest
                 "{" +
                     "\"dependencies\":" +
                     "[" +
-                        "\"reaktor:1.0.0\"," +
+                        "\"org.reaktivity:reaktor:1.0.0\"," +
                         "\"org.reaktivity:nukleus-tcp:1.0.0\"" +
                     "]" +
                 "}";
@@ -276,7 +276,7 @@ public class RymConfigurationTest
         RymConfiguration config = builder.fromJson(text, RymConfiguration.class);
 
         assertThat(config, not(nullValue()));
-        assertThat(config.getDependencies(), equalTo(asList(new RymDependency("org.reaktivity", "reaktor", "1.0.0"),
+        assertThat(config.dependencies, equalTo(asList(new RymDependency("org.reaktivity", "reaktor", "1.0.0"),
                 new RymDependency("org.reaktivity", "nukleus-tcp", "1.0.0"))));
     }
 

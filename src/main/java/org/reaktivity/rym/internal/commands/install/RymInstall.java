@@ -109,7 +109,7 @@ public final class RymInstall extends RymCommand
             logger.info("resolving dependencies");
             createDirectories(cacheDir);
             RymCache cache = new RymCache(config.repositories, cacheDir);
-            Collection<RymArtifact> artifacts = cache.resolve(config.dependencies);
+            Collection<RymArtifact> artifacts = cache.resolve(config.imports, config.dependencies);
 
             createDirectories(modulesDir);
             createDirectories(generatedDir);

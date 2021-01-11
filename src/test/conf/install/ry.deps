@@ -5,10 +5,15 @@
     "https://repo1.maven.org/maven2/"
   ],
 
+  "imports":
+  [
+    "org.reaktivity:ry-bom:develop-SNAPSHOT"
+  ],
+
   "dependencies":
   [
-    "org.reaktivity:reaktor:0.153",
-    "org.reaktivity:nukleus-echo:0.18",
+    "org.reaktivity:reaktor",
+    "org.reaktivity:nukleus-echo",
     "org.reaktivity:ry-list:develop-SNAPSHOT"
   ]
 }

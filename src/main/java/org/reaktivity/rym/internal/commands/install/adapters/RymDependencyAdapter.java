@@ -31,7 +31,7 @@ public final class RymDependencyAdapter implements JsonbAdapter<RymDependency, J
 
     private static final String DEPENDENCY_FORMAT = "%s:%s:%s";
     private static final Pattern DEPENDENCY_PATTERN =
-            Pattern.compile("(?:(?<groupId>[^:]+):)?(?<artifactId>[^:]+):(?<version>[^:]+)");
+            Pattern.compile("(?<groupId>[^:]+):(?<artifactId>[^:]+)(?::(?<version>[^:]+))?");
 
     @Override
     public JsonString adaptToJson(

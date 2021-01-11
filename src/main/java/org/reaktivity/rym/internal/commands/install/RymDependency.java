@@ -58,6 +58,14 @@ public final class RymDependency
                 Objects.equals(this.version, that.version);
     }
 
+    public static RymDependency of(
+        String groupId,
+        String artifactId,
+        String version)
+    {
+        return new RymDependency(groupId, artifactId, version);
+    }
+
     RymDependency(
         String groupId,
         String artifactId,

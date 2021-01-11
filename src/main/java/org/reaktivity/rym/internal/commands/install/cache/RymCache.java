@@ -15,12 +15,16 @@
  */
 package org.reaktivity.rym.internal.commands.install.cache;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Optional.ofNullable;
 import static org.apache.ivy.util.filter.FilterHelper.getArtifactTypeFilter;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,12 +34,14 @@ import org.apache.ivy.core.module.descriptor.DefaultDependencyDescriptor;
 import org.apache.ivy.core.module.descriptor.DefaultModuleDescriptor;
 import org.apache.ivy.core.module.descriptor.DependencyDescriptor;
 import org.apache.ivy.core.module.descriptor.ModuleDescriptor;
+import org.apache.ivy.core.module.id.ModuleId;
 import org.apache.ivy.core.module.id.ModuleRevisionId;
 import org.apache.ivy.core.report.ArtifactDownloadReport;
 import org.apache.ivy.core.report.ResolveReport;
 import org.apache.ivy.core.resolve.IvyNode;
 import org.apache.ivy.core.resolve.ResolveOptions;
 import org.apache.ivy.core.settings.IvySettings;
+import org.apache.ivy.plugins.parser.m2.PomModuleDescriptorBuilder;
 import org.apache.ivy.plugins.resolver.ChainResolver;
 import org.apache.ivy.plugins.resolver.IBiblioResolver;
 import org.apache.ivy.plugins.resolver.RepositoryResolver;
@@ -72,12 +78,45 @@ public final class RymCache
     }
 
     public List<RymArtifact> resolve(
+        List<RymDependency> imports,
         List<RymDependency> dependencies)
     {
-        ModuleRevisionId[] resolveIds = dependencies.stream()
-            .map(d -> ModuleRevisionId.newInstance(d.groupId, d.artifactId, d.version))
-            .collect(Collectors.toList())
-            .toArray(new ModuleRevisionId[0]);
+        Map<RymDependency, String> imported = resolveImports(imports);
+        ModuleDescriptor resolvable = createResolvableDescriptor(imported, dependencies);
+
+        return resolveDependencyArtifacts(resolvable);
+    }
+
+    private Map<RymDependency, String> resolveImports(
+        List<RymDependency> imports)
+    {
+        Map<RymDependency, String> imported = new LinkedHashMap<>();
+
+        ModuleDescriptor resolvable = createResolvableDescriptor(emptyMap(), imports);
+        List<ModuleDescriptor> importedIds = resolveDependencyDescriptors(resolvable);
+        importedIds.stream()
+            .map(PomModuleDescriptorBuilder::getDependencyManagementMap)
+            .flatMap(m -> m.entrySet().stream())
+            .forEach(e -> imported.put(asDependency(e.getKey()), e.getValue()));
+
+        return imported;
+    }
+
+    private RymDependency asDependency(
+        ModuleId moduleId)
+    {
+        return RymDependency.of(moduleId.getOrganisation(), moduleId.getName(), null);
+    }
+
+    private DefaultModuleDescriptor createResolvableDescriptor(
+        Map<RymDependency, String> imported,
+        List<RymDependency> dependencies)
+    {
+        List<ModuleRevisionId> revisionIds = dependencies.stream()
+            .map(d -> ModuleRevisionId.newInstance(d.groupId, d.artifactId, ofNullable(d.version).orElse(imported.get(d))))
+            .collect(Collectors.toList());
+
+        ModuleRevisionId[] resolveIds = revisionIds.toArray(new ModuleRevisionId[0]);
 
         boolean changing = false;
         DefaultModuleDescriptor moduleDescriptor = new DefaultModuleDescriptor(
@@ -97,7 +136,42 @@ public final class RymCache
             }
             moduleDescriptor.addDependency(dd);
         }
+        return moduleDescriptor;
+    }
 
+    private List<ModuleDescriptor> resolveDependencyDescriptors(
+        ModuleDescriptor moduleDescriptor)
+    {
+        List<ModuleDescriptor> descriptors = new LinkedList<>();
+        try
+        {
+            ResolveReport report = ivy.resolve(moduleDescriptor, options);
+            if (report.hasError())
+            {
+                throw new Exception("Unable to resolve: " + report);
+            }
+
+            for (IvyNode node : report.getDependencies())
+            {
+                ModuleDescriptor descriptor = node.getDescriptor();
+                if (descriptor == null)
+                {
+                    continue;
+                }
+                descriptors.add(descriptor);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new RuntimeException(ex);
+        }
+
+        return descriptors;
+    }
+
+    private List<RymArtifact> resolveDependencyArtifacts(
+        ModuleDescriptor moduleDescriptor)
+    {
         List<RymArtifact> artifacts = new LinkedList<>();
         try
         {
