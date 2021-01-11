@@ -28,7 +28,11 @@ public class RymCleanTest
     @Test
     public void shouldCleanup()
     {
-        String[] args = { "clean", "--output-directory", "target/rym" };
+        String[] args =
+        {
+            "clean",
+            "--output-directory", "target/rym"
+        };
 
         Cli<Runnable> parser = new Cli<>(RymCli.class);
         Runnable clean = parser.parse(args);
