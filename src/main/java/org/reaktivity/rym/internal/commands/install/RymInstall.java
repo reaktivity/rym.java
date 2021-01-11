@@ -124,7 +124,7 @@ public final class RymInstall extends RymCommand
             generateDelegating(modules);
 
             deleteDirectories(imageDir);
-            linkModules(logger, modules);
+            linkModules(modules);
             logger.info("linked modules");
 
             generateLauncher();
@@ -457,7 +457,6 @@ public final class RymInstall extends RymCommand
     }
 
     private void linkModules(
-        MessageLogger logger,
         Collection<RymModule> modules) throws IOException
     {
         ToolProvider jlink = ToolProvider.findFirst("jlink").get();
