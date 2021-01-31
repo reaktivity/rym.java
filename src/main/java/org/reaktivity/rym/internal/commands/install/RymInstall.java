@@ -120,8 +120,12 @@ public final class RymInstall extends RymCommand
             generateSystemOnlyAutomatic(modules);
             delegateAutomatic(modules, delegate);
             copyNonDelegating(modules);
-            generateDelegate(delegate);
-            generateDelegating(modules);
+
+            if (!delegate.paths.isEmpty())
+            {
+                generateDelegate(delegate);
+                generateDelegating(modules);
+            }
 
             deleteDirectories(imageDir);
             linkModules(modules);
