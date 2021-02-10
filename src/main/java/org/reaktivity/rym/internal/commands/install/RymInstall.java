@@ -485,6 +485,7 @@ public final class RymInstall extends RymCommand
                 "JLINK_VM_OPTIONS=",
                 String.format(
                     "%s/bin/java " +
+                    "--add-opens java.base/sun.nio.ch=org.agrona.core " +
                     "$JLINK_VM_OPTIONS " +
                     "-m org.reaktivity.ry/org.reaktivity.ry.internal.RyMain \"$@\"",
                     imageDir)));
