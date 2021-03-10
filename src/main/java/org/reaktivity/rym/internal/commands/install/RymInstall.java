@@ -54,6 +54,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.spi.ToolProvider;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.json.bind.Jsonb;
 import javax.json.bind.JsonbBuilder;
@@ -464,17 +465,37 @@ public final class RymInstall extends RymCommand
         Collection<RymModule> modules) throws IOException
     {
         ToolProvider jlink = ToolProvider.findFirst("jlink").get();
-        jlink.run(
-            System.out,
-            System.err,
-            "--verbose",
+
+        List<String> extraModuleNames = new ArrayList<>();
+        if (debug)
+        {
+            extraModuleNames.add("jdk.jdwp.agent");
+        }
+
+        Stream<String> moduleNames = Stream.concat(modules.stream().map(m -> m.name), extraModuleNames.stream());
+
+        List<String> args = new ArrayList<>(Arrays.asList(
             "--module-path", modulesDir.toString(),
             "--output", imageDir.toString(),
             "--no-header-files",
             "--no-man-pages",
-            "--strip-debug",
             "--compress", "2",
-            "--add-modules", modules.stream().map(m -> m.name).collect(Collectors.joining(",")));
+            "--add-modules", moduleNames.collect(Collectors.joining(","))));
+
+        if (!debug)
+        {
+            args.add("--strip-debug");
+        }
+
+        if (!silent)
+        {
+            args.add("--verbose");
+        }
+
+        jlink.run(
+            System.out,
+            System.err,
+            args.toArray(String[]::new));
     }
 
     private void generateLauncher() throws IOException
@@ -482,12 +503,11 @@ public final class RymInstall extends RymCommand
         Path ryPath = launcherDir.resolve("ry");
         Files.write(ryPath, Arrays.asList(
                 "#!/bin/sh",
-                "JLINK_VM_OPTIONS=",
-                String.format(
-                    "%s/bin/java " +
-                    "--add-opens java.base/sun.nio.ch=org.agrona.core " +
-                    "$JLINK_VM_OPTIONS " +
-                    "-m org.reaktivity.ry/org.reaktivity.ry.internal.RyMain \"$@\"",
+                String.format(String.join(" ", Arrays.asList(
+                    "%s/bin/java",
+                    "--add-opens java.base/sun.nio.ch=org.agrona.core",
+                    "$JAVA_OPTIONS",
+                    "-m org.reaktivity.ry/org.reaktivity.ry.internal.RyMain \"$@\"")),
                     imageDir)));
         ryPath.toFile().setExecutable(true);
     }

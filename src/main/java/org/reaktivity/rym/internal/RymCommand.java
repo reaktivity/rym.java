@@ -34,6 +34,9 @@ public abstract class RymCommand implements Runnable
             hidden = true)
     public Boolean silent = false;
 
+    @Option(name = { "--debug" })
+    public Boolean debug = false;
+
     @Option(name = { "--config-directory" },
             description = "config directory",
             typeConverterProvider = RymPathConverterProvider.class)
