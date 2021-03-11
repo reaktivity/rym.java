@@ -70,6 +70,7 @@ import org.reaktivity.rym.internal.commands.install.cache.RymCache;
 import org.reaktivity.rym.internal.commands.install.cache.RymModule;
 
 import com.github.rvesse.airline.annotations.Command;
+import com.github.rvesse.airline.annotations.Option;
 
 @Command(
     name = "install",
@@ -78,6 +79,12 @@ public final class RymInstall extends RymCommand
 {
     private static final String MODULE_INFO_JAVA_FILENAME = "module-info.java";
     private static final String MODULE_INFO_CLASS_FILENAME = "module-info.class";
+
+    @Option(name = { "--debug" })
+    public Boolean debug = false;
+
+    @Option(name = { "--ignore-signing-information" })
+    public Boolean ignoreSigning = false;
 
     @Override
     public void invoke()
@@ -481,6 +488,11 @@ public final class RymInstall extends RymCommand
             "--no-man-pages",
             "--compress", "2",
             "--add-modules", moduleNames.collect(Collectors.joining(","))));
+
+        if (ignoreSigning)
+        {
+            args.add("--ignore-signing-information");
+        }
 
         if (!debug)
         {
