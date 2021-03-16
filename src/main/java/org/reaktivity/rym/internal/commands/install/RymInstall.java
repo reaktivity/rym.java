@@ -96,20 +96,20 @@ public final class RymInstall extends RymCommand
         task:
         try
         {
-            Path depsFile = configDir.resolve("ry.deps");
-            if (!Files.exists(depsFile))
+            Path rymFile = configDir.resolve("rym.json");
+            if (!Files.exists(rymFile))
             {
-                logger.error(String.format("missing %s", depsFile));
+                logger.error(String.format("missing %s", rymFile));
                 break task;
             }
 
-            logger.info(String.format("reading %s", depsFile));
+            logger.info(String.format("reading %s", rymFile));
             Jsonb builder = JsonbBuilder.newBuilder()
                                         .withConfig(new JsonbConfig().withFormatting(true))
                                         .build();
-            RymConfiguration config = builder.fromJson(newInputStream(depsFile), RymConfiguration.class);
+            RymConfiguration config = builder.fromJson(newInputStream(rymFile), RymConfiguration.class);
 
-            Path lockFile = lockDir.resolve("ry.deps.lock");
+            Path lockFile = lockDir.resolve("rym-lock.json");
             logger.info(String.format("updating %s", lockFile));
             createDirectories(lockDir);
             builder.toJson(config, newOutputStream(lockFile));
