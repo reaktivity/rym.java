@@ -31,6 +31,7 @@ public class RymWrapTest
         String[] args =
         {
             "wrap",
+            "--version", "1.0",
             "--output-directory", "target/rym",
             "--launcher-directory", "target"
         };

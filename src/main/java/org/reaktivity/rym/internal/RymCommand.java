@@ -27,6 +27,8 @@ import com.github.rvesse.airline.annotations.Option;
 
 public abstract class RymCommand implements Runnable
 {
+    public static final String VERSION = RymCommand.class.getPackage().getImplementationVersion();
+
     @Inject
     public HelpOption<RymCommand> helpOption;
 

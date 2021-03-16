@@ -36,7 +36,7 @@ public class RymWrap extends RymCommand
     public String repoURL = "https://repo.maven.apache.org/maven2";
 
     @Option(name = { "--version" })
-    public String version = "0.1";
+    public String version = VERSION;
 
     @Option(name = { "--rymw-directory" },
             description = "rymw directory",
@@ -49,11 +49,18 @@ public class RymWrap extends RymCommand
     @Override
     public void invoke()
     {
-        wrappedPath = outputDir.resolve("wrapper").resolve("rym.jar");
-        wrappedURL = String.format("%s/org/reaktivity/rym/%s/rym-%s.jar", repoURL, version, version);
-
+        task:
         try
         {
+            if (version == null)
+            {
+                System.out.println("version not specified");
+                break task;
+            }
+
+            wrappedPath = outputDir.resolve("wrapper").resolve(String.format("rym-%s.jar", version));
+            wrappedURL = String.format("%s/org/reaktivity/rym/%s/rym-%s.jar", repoURL, version, version);
+
             generateWrapper();
         }
         catch (Exception ex)
@@ -75,7 +82,7 @@ public class RymWrap extends RymCommand
                     "curl -o \"$wrappedPath\" \"$wrappedURL\" -f",
                   "fi",
                 "fi",
-                "java -jar \"$wrappedPath\" \"$@\""));
+                "java $JAVA_OPTIONS -jar \"$wrappedPath\" \"$@\""));
         rymwPath.toFile().setExecutable(true);
     }
 }
