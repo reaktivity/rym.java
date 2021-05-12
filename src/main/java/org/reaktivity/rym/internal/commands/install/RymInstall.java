@@ -86,6 +86,9 @@ public final class RymInstall extends RymCommand
     private static final String MODULE_INFO_JAVA_FILENAME = "module-info.java";
     private static final String MODULE_INFO_CLASS_FILENAME = "module-info.class";
 
+    @Option(name = { "--tidy" })
+    public Boolean tidy = false;
+
     @Option(name = { "--debug" })
     public Boolean debug = false;
 
@@ -158,6 +161,14 @@ public final class RymInstall extends RymCommand
 
             generateLauncher();
             logger.info("generated launcher");
+
+            if (tidy)
+            {
+                logger.info("tidying");
+                deleteDirectories(modulesDir);
+                deleteDirectories(generatedDir);
+                deleteDirectories(cacheDir);
+            }
         }
         catch (Exception ex)
         {
