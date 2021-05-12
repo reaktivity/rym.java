@@ -16,10 +16,36 @@
 package org.reaktivity.rym.internal.commands.install;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class RymConfiguration
 {
     public List<RymDependency> dependencies;
     public List<RymDependency> imports;
     public List<RymRepository> repositories;
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(dependencies, imports, repositories);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj == this)
+        {
+            return true;
+        }
+
+        if (!(obj instanceof RymConfiguration))
+        {
+            return false;
+        }
+
+        RymConfiguration that = (RymConfiguration) obj;
+        return Objects.deepEquals(this.dependencies, that.dependencies) &&
+                Objects.deepEquals(this.imports, that.imports) &&
+                Objects.deepEquals(this.repositories, that.repositories);
+    }
 }

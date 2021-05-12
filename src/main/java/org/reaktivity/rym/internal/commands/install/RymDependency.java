@@ -58,6 +58,12 @@ public final class RymDependency
                 Objects.equals(this.version, that.version);
     }
 
+    @Override
+    public String toString()
+    {
+        return String.format("%s:%s:%s", groupId, artifactId, version);
+    }
+
     public static RymDependency of(
         String groupId,
         String artifactId,

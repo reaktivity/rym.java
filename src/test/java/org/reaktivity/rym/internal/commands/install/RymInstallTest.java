@@ -17,7 +17,6 @@ package org.reaktivity.rym.internal.commands.install;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.io.FileMatchers.anExistingFile;
 
 import java.io.File;
@@ -30,21 +29,6 @@ import com.github.rvesse.airline.Cli;
 
 public class RymInstallTest
 {
-    @Test
-    public void shouldNotInstallWhenDepsMissing()
-    {
-        String[] args = { "install", "--silent" };
-
-        Cli<Runnable> parser = new Cli<>(RymCli.class);
-        Runnable install = parser.parse(args);
-
-        install.run();
-
-        assertThat(install, instanceOf(RymInstall.class));
-        assertThat(new File("ry.deps"), not(anExistingFile()));
-        assertThat(new File("ry.deps.lock"), not(anExistingFile()));
-    }
-
     @Test
     public void shouldInstallEcho() throws IOException
     {

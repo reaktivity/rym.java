@@ -17,14 +17,20 @@ package org.reaktivity.rym.internal.commands.install;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.createDirectories;
+import static java.nio.file.Files.getLastModifiedTime;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.list;
 import static java.util.Comparator.reverseOrder;
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.module.ModuleDescriptor;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
@@ -93,31 +99,42 @@ public final class RymInstall extends RymCommand
         MessageLogger logger = new DefaultMessageLogger(level);
         Message.setDefaultLogger(logger);
 
-        task:
         try
         {
+            RymConfiguration config;
+
             Path rymFile = configDir.resolve("rym.json");
-            if (!Files.exists(rymFile))
-            {
-                logger.error(String.format("missing %s", rymFile));
-                break task;
-            }
 
             logger.info(String.format("reading %s", rymFile));
-            Jsonb builder = JsonbBuilder.newBuilder()
-                                        .withConfig(new JsonbConfig().withFormatting(true))
-                                        .build();
-            RymConfiguration config = builder.fromJson(newInputStream(rymFile), RymConfiguration.class);
+            config = readOrDefaultConfig(rymFile);
 
             Path lockFile = lockDir.resolve("rym-lock.json");
-            logger.info(String.format("updating %s", lockFile));
-            createDirectories(lockDir);
-            builder.toJson(config, newOutputStream(lockFile));
+            logger.info(String.format("reading %s", lockFile));
+            config = overrideConfigIfLocked(config, rymFile, lockFile);
 
             logger.info("resolving dependencies");
             createDirectories(cacheDir);
             RymCache cache = new RymCache(config.repositories, cacheDir);
             Collection<RymArtifact> artifacts = cache.resolve(config.imports, config.dependencies);
+            Map<RymDependency, RymDependency> resolvables = artifacts.stream()
+                    .map(a -> a.id)
+                    .collect(
+                        toMap(
+                            id -> RymDependency.of(id.group, id.artifact, null),
+                            id -> RymDependency.of(id.group, id.artifact, id.version)));
+
+            RymConfiguration resolved = new RymConfiguration();
+            resolved.repositories = config.repositories;
+            resolved.imports = null;
+            resolved.dependencies = config.dependencies.stream()
+                    .map(d -> ofNullable(resolvables.get(d)).orElse(d))
+                    .collect(toList());
+
+            if (!resolved.equals(config))
+            {
+                logger.info(String.format("writing %s", lockFile));
+                writeLockFile(resolved, lockFile);
+            }
 
             createDirectories(modulesDir);
             createDirectories(generatedDir);
@@ -153,6 +170,64 @@ public final class RymInstall extends RymCommand
             {
                 logger.sumupProblems();
             }
+        }
+    }
+
+    private RymConfiguration readOrDefaultConfig(
+        Path rymFile) throws IOException
+    {
+        RymConfiguration config = new RymConfiguration();
+        config.repositories = emptyList();
+        config.imports = emptyList();
+        config.dependencies = emptyList();
+
+        Jsonb builder = JsonbBuilder.newBuilder()
+                .withConfig(new JsonbConfig().withFormatting(true))
+                .build();
+
+        if (Files.exists(rymFile))
+        {
+            try (InputStream in = newInputStream(rymFile))
+            {
+                config = builder.fromJson(in, RymConfiguration.class);
+            }
+        }
+
+        return config;
+    }
+
+    private RymConfiguration overrideConfigIfLocked(
+        RymConfiguration config,
+        Path rymFile,
+        Path lockFile) throws IOException
+    {
+        if (Files.exists(lockFile) &&
+            getLastModifiedTime(lockFile).compareTo(getLastModifiedTime(rymFile)) >= 0)
+        {
+            Jsonb builder = JsonbBuilder.newBuilder()
+                    .withConfig(new JsonbConfig().withFormatting(true))
+                    .build();
+
+            try (InputStream in = newInputStream(lockFile))
+            {
+                config = builder.fromJson(in, RymConfiguration.class);
+            }
+        }
+        return config;
+    }
+
+    private void writeLockFile(
+        RymConfiguration config,
+        Path lockFile) throws IOException
+    {
+        Jsonb builder = JsonbBuilder.newBuilder()
+                .withConfig(new JsonbConfig().withFormatting(true))
+                .build();
+
+        createDirectories(lockDir);
+        try (OutputStream out = newOutputStream(lockFile))
+        {
+            builder.toJson(config, out);
         }
     }
 

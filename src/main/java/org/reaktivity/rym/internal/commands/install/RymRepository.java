@@ -54,6 +54,12 @@ public final class RymRepository
         return Objects.equals(this.location, that.location);
     }
 
+    @Override
+    public String toString()
+    {
+        return location;
+    }
+
     RymRepository(
         String location)
     {

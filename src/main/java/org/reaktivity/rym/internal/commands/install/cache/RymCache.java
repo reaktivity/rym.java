@@ -92,12 +92,15 @@ public final class RymCache
     {
         Map<RymDependency, String> imported = new LinkedHashMap<>();
 
-        ModuleDescriptor resolvable = createResolvableDescriptor(emptyMap(), imports);
-        List<ModuleDescriptor> importedIds = resolveDependencyDescriptors(resolvable);
-        importedIds.stream()
-            .map(PomModuleDescriptorBuilder::getDependencyManagementMap)
-            .flatMap(m -> m.entrySet().stream())
-            .forEach(e -> imported.put(asDependency(e.getKey()), e.getValue()));
+        if (imports != null)
+        {
+            ModuleDescriptor resolvable = createResolvableDescriptor(emptyMap(), imports);
+            List<ModuleDescriptor> importedIds = resolveDependencyDescriptors(resolvable);
+            importedIds.stream()
+                .map(PomModuleDescriptorBuilder::getDependencyManagementMap)
+                .flatMap(m -> m.entrySet().stream())
+                .forEach(e -> imported.put(asDependency(e.getKey()), e.getValue()));
+        }
 
         return imported;
     }
