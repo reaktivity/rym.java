@@ -599,6 +599,7 @@ public final class RymInstall extends RymCommand
         Path ryPath = launcherDir.resolve("ry");
         Files.write(ryPath, Arrays.asList(
                 "#!/bin/sh",
+                "cd \"${0%/*}\"",
                 String.format(String.join(" ", Arrays.asList(
                     "%s/bin/java",
                     "--add-opens java.base/sun.nio.ch=org.agrona.core",
