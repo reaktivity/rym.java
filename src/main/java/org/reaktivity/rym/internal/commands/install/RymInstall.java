@@ -92,6 +92,9 @@ public final class RymInstall extends RymCommand
     @Option(name = { "--ignore-signing-information" })
     public Boolean ignoreSigning = false;
 
+    @Option(name = { "--exclude-local-repository" })
+    public boolean excludeLocalRepo;
+
     @Override
     public void invoke()
     {
@@ -114,7 +117,13 @@ public final class RymInstall extends RymCommand
 
             logger.info("resolving dependencies");
             createDirectories(cacheDir);
-            RymCache cache = new RymCache(config.repositories, cacheDir);
+            List<RymRepository> repositories = new ArrayList<>(config.repositories);
+            if (!excludeLocalRepo)
+            {
+                String localRepo = String.format("file://%s/.m2/repository", System.getProperty("user.home"));
+                repositories.add(0, new RymRepository(localRepo));
+            }
+            RymCache cache = new RymCache(repositories, cacheDir);
             Collection<RymArtifact> artifacts = cache.resolve(config.imports, config.dependencies);
             Map<RymDependency, RymDependency> resolvables = artifacts.stream()
                     .map(a -> a.id)
