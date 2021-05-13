@@ -35,6 +35,9 @@ public class RymWrap extends RymCommand
     @Option(name = { "--repository" })
     public String repoURL = "https://repo.maven.apache.org/maven2";
 
+    @Option(name = { "--local-repository" })
+    public Path localRepoDir = Paths.get("$HOME/.m2/repository");
+
     @Option(name = { "--version" })
     public String version = VERSION;
 
@@ -44,6 +47,7 @@ public class RymWrap extends RymCommand
     public Path rymwDir = Paths.get(".rymw");
 
     private Path wrappedPath;
+    private Path localPath;
     private String wrappedURL;
 
     @Override
@@ -59,6 +63,7 @@ public class RymWrap extends RymCommand
             }
 
             wrappedPath = outputDir.resolve("wrapper").resolve(String.format("rym-%s.jar", version));
+            localPath = localRepoDir.resolve(String.format("org/reaktivity/rym/%s/rym-%s.jar", version, version));
             wrappedURL = String.format("%s/org/reaktivity/rym/%s/rym-%s.jar", repoURL, version, version);
 
             generateWrapper();
@@ -74,12 +79,21 @@ public class RymWrap extends RymCommand
         Path rymwPath = launcherDir.resolve("rymw");
         Files.write(rymwPath, Arrays.asList(
                 "#!/bin/sh",
+                String.format("localPath=\"%s\"", localPath),
                 String.format("wrappedPath=\"%s\"", wrappedPath),
                 String.format("wrappedURL=\"%s\"", wrappedURL),
                 "if [ ! -r \"$wrappedPath\" ]; then",
-                  "echo $wrappedPath not found, downloading from $wrappedURL",
-                  "if command -v curl > /dev/null; then",
-                    "curl -o \"$wrappedPath\" \"$wrappedURL\" -f",
+                  "if [ -r \"$localPath\" ]; then",
+                    "echo $wrappedPath not found, copying from $localPath",
+                    "mkdir -p `dirname $wrappedPath`",
+                    "cp $localPath $wrappedPath",
+                  "else",
+                    "echo $wrappedPath not found, downloading from $wrappedURL",
+                    "if command -v curl > /dev/null; then",
+                      "curl -o \"$wrappedPath\" \"$wrappedURL\" -f",
+                    "else",
+                      "echo curl missing, download failed",
+                    "fi",
                   "fi",
                 "fi",
                 "java $JAVA_OPTIONS -jar \"$wrappedPath\" \"$@\""));
