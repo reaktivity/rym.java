@@ -25,12 +25,16 @@ import java.nio.file.Path;
 import org.reaktivity.rym.internal.RymCommand;
 
 import com.github.rvesse.airline.annotations.Command;
+import com.github.rvesse.airline.annotations.Option;
 
 @Command(
     name = "clean",
     description = "Clean up")
 public final class RymClean extends RymCommand
 {
+    @Option(name = { "--keep-image" })
+    public Boolean keepImage = false;
+
     @Override
     public void invoke()
     {
@@ -50,6 +54,7 @@ public final class RymClean extends RymCommand
         if (Files.exists(dir))
         {
             Files.walk(dir)
+                 .filter(p -> !keepImage || !p.startsWith(imageDir))
                  .sorted(reverseOrder())
                  .map(Path::toFile)
                  .forEach(File::delete);
