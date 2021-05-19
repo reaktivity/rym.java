@@ -15,6 +15,7 @@
  */
 package org.reaktivity.rym.internal.commands.clean;
 
+import static java.nio.file.Files.deleteIfExists;
 import static java.util.Comparator.reverseOrder;
 
 import java.io.File;
@@ -40,6 +41,10 @@ public final class RymClean extends RymCommand
     {
         try
         {
+            if (!keepImage)
+            {
+                deleteIfExists(launcherDir.resolve("ry"));
+            }
             deleteDirectories(outputDir);
         }
         catch (IOException ex)
