@@ -11,8 +11,8 @@
 
   "dependencies":
   [
-    "org.reaktivity:reaktor",
-    "org.reaktivity:nukleus-echo",
-    "org.reaktivity:ry"
+    "org.reaktivity:reaktor:0.166",
+    "org.reaktivity:nukleus-echo:0.25",
+    "org.reaktivity:ry:0.57"
   ]
 }
