@@ -8,6 +8,7 @@
   <artifactId>rym</artifactId>
   <version>develop-SNAPSHOT</version>
   <name>Reaktivity Management Tool</name>
+  <description>Reaktivity Management Tool</description>
   <url>https://github.com/reaktivity/rym.java</url>
 
   <licenses>
