@@ -13,7 +13,6 @@
   [
     "org.reaktivity:reaktor",
     "org.reaktivity:nukleus-echo",
-    "org.reaktivity:ry",
-    "org.reaktivity:ry-list:develop-SNAPSHOT"
+    "org.reaktivity:ry"
   ]
 }
