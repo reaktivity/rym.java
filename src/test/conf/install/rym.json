@@ -1,0 +1,18 @@
+{
+  "repositories":
+  [ 
+    "https://repo1.maven.org/maven2/"
+  ],
+
+  "imports":
+  [
+    "org.reaktivity:ry-bom:0.615"
+  ],
+
+  "dependencies":
+  [
+    "org.reaktivity:reaktor:0.166",
+    "org.reaktivity:nukleus-echo:0.25",
+    "org.reaktivity:ry:0.57"
+  ]
+}
