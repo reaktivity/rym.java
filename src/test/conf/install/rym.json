@@ -6,13 +6,13 @@
 
   "imports":
   [
-    "org.reaktivity:ry-bom:0.615"
+    "org.reaktivity:ry-bom:0.623"
   ],
 
   "dependencies":
   [
-    "org.reaktivity:reaktor:0.166",
-    "org.reaktivity:nukleus-echo:0.25",
-    "org.reaktivity:ry:0.57"
+    "org.reaktivity:reaktor",
+    "org.reaktivity:nukleus-echo",
+    "org.reaktivity:ry"
   ]
 }
