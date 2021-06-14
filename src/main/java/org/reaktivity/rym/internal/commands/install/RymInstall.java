@@ -22,6 +22,7 @@ import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.list;
+import static java.util.Collections.singletonMap;
 import static java.util.Comparator.reverseOrder;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
@@ -88,6 +89,8 @@ public final class RymInstall extends RymCommand
 {
     private static final String MODULE_INFO_JAVA_FILENAME = "module-info.java";
     private static final String MODULE_INFO_CLASS_FILENAME = "module-info.class";
+
+    private static final Map<String, String> DEFAULT_REALMS = initDefaultRealms();
 
     @Option(name = { "--debug" })
     public Boolean debug = false;
@@ -205,11 +208,16 @@ public final class RymInstall extends RymCommand
 
         for (RymCredentials credentials : settings.credentials)
         {
+            String realm = defaultRealmIfNecessary(credentials);
+            String host = credentials.host;
+            String username = credentials.username;
+            String password = credentials.password;
+
             CredentialsStore.INSTANCE.addCredentials(
-                credentials.realm,
-                credentials.host,
-                credentials.username,
-                credentials.password);
+                realm,
+                host,
+                username,
+                password);
         }
     }
 
@@ -723,5 +731,17 @@ public final class RymInstall extends RymCommand
                  .map(Path::toFile)
                  .forEach(File::delete);
         }
+    }
+
+    private String defaultRealmIfNecessary(
+        RymCredentials credentials)
+    {
+        return ofNullable(credentials.realm)
+            .orElse(DEFAULT_REALMS.get(credentials.host));
+    }
+
+    private static Map<String, String> initDefaultRealms()
+    {
+        return singletonMap("maven.pkg.github.com", "GitHub Package Registry");
     }
 }
