@@ -69,11 +69,14 @@ import javax.json.bind.JsonbConfig;
 import org.apache.ivy.util.DefaultMessageLogger;
 import org.apache.ivy.util.Message;
 import org.apache.ivy.util.MessageLogger;
+import org.apache.ivy.util.url.CredentialsStore;
 import org.reaktivity.rym.internal.RymCommand;
 import org.reaktivity.rym.internal.commands.install.cache.RymArtifact;
 import org.reaktivity.rym.internal.commands.install.cache.RymArtifactId;
 import org.reaktivity.rym.internal.commands.install.cache.RymCache;
 import org.reaktivity.rym.internal.commands.install.cache.RymModule;
+import org.reaktivity.rym.internal.settings.RymCredentials;
+import org.reaktivity.rym.internal.settings.RymSettings;
 
 import com.github.rvesse.airline.annotations.Command;
 import com.github.rvesse.airline.annotations.Option;
@@ -88,9 +91,6 @@ public final class RymInstall extends RymCommand
 
     @Option(name = { "--debug" })
     public Boolean debug = false;
-
-    @Option(name = { "--ignore-signing-information" })
-    public Boolean ignoreSigning = false;
 
     @Option(name = { "--exclude-local-repository" })
     public boolean excludeLocalRepo;
@@ -116,6 +116,7 @@ public final class RymInstall extends RymCommand
             config = overrideConfigIfLocked(config, rymFile, lockFile);
 
             logger.info("resolving dependencies");
+            readCredentials(settingsDir);
             createDirectories(cacheDir);
             List<RymRepository> repositories = new ArrayList<>(config.repositories);
             if (!excludeLocalRepo)
@@ -179,6 +180,36 @@ public final class RymInstall extends RymCommand
             {
                 logger.sumupProblems();
             }
+        }
+    }
+
+    private void readCredentials(
+        Path settingsDir) throws IOException
+    {
+        Path settingsFile = settingsDir.resolve("settings.json");
+
+        RymSettings settings = new RymSettings();
+        settings.credentials = emptyList();
+
+        Jsonb builder = JsonbBuilder.newBuilder()
+                .withConfig(new JsonbConfig().withFormatting(true))
+                .build();
+
+        if (Files.exists(settingsFile))
+        {
+            try (InputStream in = newInputStream(settingsFile))
+            {
+                settings = builder.fromJson(in, RymSettings.class);
+            }
+        }
+
+        for (RymCredentials credentials : settings.credentials)
+        {
+            CredentialsStore.INSTANCE.addCredentials(
+                credentials.realm,
+                credentials.host,
+                credentials.username,
+                credentials.password);
         }
     }
 
@@ -573,10 +604,7 @@ public final class RymInstall extends RymCommand
             "--compress", "2",
             "--add-modules", moduleNames.collect(Collectors.joining(","))));
 
-        if (ignoreSigning)
-        {
-            args.add("--ignore-signing-information");
-        }
+        args.add("--ignore-signing-information");
 
         if (!debug)
         {

@@ -36,6 +36,11 @@ public abstract class RymCommand implements Runnable
             hidden = true)
     public Boolean silent = false;
 
+    @Option(name = { "--settings-directory" },
+            description = "settings directory",
+            typeConverterProvider = RymPathConverterProvider.class)
+    public Path settingsDir = Paths.get(System.getProperty("user.home"), ".rym");
+
     @Option(name = { "--config-directory" },
             description = "config directory",
             typeConverterProvider = RymPathConverterProvider.class)
