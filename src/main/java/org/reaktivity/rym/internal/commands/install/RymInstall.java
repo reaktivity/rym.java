@@ -27,6 +27,8 @@ import static java.util.Comparator.reverseOrder;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.reaktivity.rym.internal.settings.RymSecrets.decryptSecret;
+import static org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher.SYSTEM_PROPERTY_SEC_LOCATION;
 
 import java.io.File;
 import java.io.IOException;
@@ -77,7 +79,10 @@ import org.reaktivity.rym.internal.commands.install.cache.RymArtifactId;
 import org.reaktivity.rym.internal.commands.install.cache.RymCache;
 import org.reaktivity.rym.internal.commands.install.cache.RymModule;
 import org.reaktivity.rym.internal.settings.RymCredentials;
+import org.reaktivity.rym.internal.settings.RymSecrets;
+import org.reaktivity.rym.internal.settings.RymSecurity;
 import org.reaktivity.rym.internal.settings.RymSettings;
+import org.sonatype.plexus.components.cipher.PlexusCipherException;
 
 import com.github.rvesse.airline.annotations.Command;
 import com.github.rvesse.airline.annotations.Option;
@@ -119,7 +124,7 @@ public final class RymInstall extends RymCommand
             config = overrideConfigIfLocked(config, rymFile, lockFile);
 
             logger.info("resolving dependencies");
-            readCredentials(settingsDir);
+            readSettings(settingsDir);
             createDirectories(cacheDir);
             List<RymRepository> repositories = new ArrayList<>(config.repositories);
             if (!excludeLocalRepo)
@@ -186,8 +191,8 @@ public final class RymInstall extends RymCommand
         }
     }
 
-    private void readCredentials(
-        Path settingsDir) throws IOException
+    private void readSettings(
+        Path settingsDir) throws IOException, PlexusCipherException
     {
         Path settingsFile = settingsDir.resolve("settings.json");
 
@@ -206,18 +211,35 @@ public final class RymInstall extends RymCommand
             }
         }
 
-        for (RymCredentials credentials : settings.credentials)
+        if (settings.credentials.size() > 0)
         {
-            String realm = defaultRealmIfNecessary(credentials);
-            String host = credentials.host;
-            String username = credentials.username;
-            String password = credentials.password;
+            Path securityFile = settingsDir.resolve("security.json");
 
-            CredentialsStore.INSTANCE.addCredentials(
-                realm,
-                host,
-                username,
-                password);
+            RymSecurity security = new RymSecurity();
+
+            if (Files.exists(securityFile))
+            {
+                try (InputStream in = newInputStream(securityFile))
+                {
+                    security = builder.fromJson(in, RymSecurity.class);
+                }
+            }
+
+            security.secret = decryptSecret(security.secret, SYSTEM_PROPERTY_SEC_LOCATION);
+
+            for (RymCredentials credentials : settings.credentials)
+            {
+                String realm = defaultRealmIfNecessary(credentials);
+                String host = credentials.host;
+                String username = credentials.username;
+                String password = RymSecrets.decryptSecret(credentials.password, security.secret);
+
+                CredentialsStore.INSTANCE.addCredentials(
+                    realm,
+                    host,
+                    username,
+                    password);
+            }
         }
     }
 

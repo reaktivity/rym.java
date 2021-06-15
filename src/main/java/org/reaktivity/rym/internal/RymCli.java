@@ -16,6 +16,7 @@
 package org.reaktivity.rym.internal;
 
 import org.reaktivity.rym.internal.commands.clean.RymClean;
+import org.reaktivity.rym.internal.commands.encrypt.RymEncrypt;
 import org.reaktivity.rym.internal.commands.install.RymInstall;
 import org.reaktivity.rym.internal.commands.wrap.RymWrap;
 
@@ -30,7 +31,8 @@ import com.github.rvesse.airline.help.Help;
         Help.class,
         RymWrap.class,
         RymInstall.class,
-        RymClean.class
+        RymClean.class,
+        RymEncrypt.class
     })
 public final class RymCli
 {
