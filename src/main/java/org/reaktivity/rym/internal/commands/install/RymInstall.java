@@ -22,10 +22,13 @@ import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.list;
+import static java.util.Collections.singletonMap;
 import static java.util.Comparator.reverseOrder;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.reaktivity.rym.internal.settings.RymSecrets.decryptSecret;
+import static org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher.SYSTEM_PROPERTY_SEC_LOCATION;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,11 +72,17 @@ import javax.json.bind.JsonbConfig;
 import org.apache.ivy.util.DefaultMessageLogger;
 import org.apache.ivy.util.Message;
 import org.apache.ivy.util.MessageLogger;
+import org.apache.ivy.util.url.CredentialsStore;
 import org.reaktivity.rym.internal.RymCommand;
 import org.reaktivity.rym.internal.commands.install.cache.RymArtifact;
 import org.reaktivity.rym.internal.commands.install.cache.RymArtifactId;
 import org.reaktivity.rym.internal.commands.install.cache.RymCache;
 import org.reaktivity.rym.internal.commands.install.cache.RymModule;
+import org.reaktivity.rym.internal.settings.RymCredentials;
+import org.reaktivity.rym.internal.settings.RymSecrets;
+import org.reaktivity.rym.internal.settings.RymSecurity;
+import org.reaktivity.rym.internal.settings.RymSettings;
+import org.sonatype.plexus.components.cipher.PlexusCipherException;
 
 import com.github.rvesse.airline.annotations.Command;
 import com.github.rvesse.airline.annotations.Option;
@@ -86,11 +95,10 @@ public final class RymInstall extends RymCommand
     private static final String MODULE_INFO_JAVA_FILENAME = "module-info.java";
     private static final String MODULE_INFO_CLASS_FILENAME = "module-info.class";
 
+    private static final Map<String, String> DEFAULT_REALMS = initDefaultRealms();
+
     @Option(name = { "--debug" })
     public Boolean debug = false;
-
-    @Option(name = { "--ignore-signing-information" })
-    public Boolean ignoreSigning = false;
 
     @Option(name = { "--exclude-local-repository" })
     public boolean excludeLocalRepo;
@@ -116,6 +124,7 @@ public final class RymInstall extends RymCommand
             config = overrideConfigIfLocked(config, rymFile, lockFile);
 
             logger.info("resolving dependencies");
+            readSettings(settingsDir);
             createDirectories(cacheDir);
             List<RymRepository> repositories = new ArrayList<>(config.repositories);
             if (!excludeLocalRepo)
@@ -178,6 +187,58 @@ public final class RymInstall extends RymCommand
             if (!silent)
             {
                 logger.sumupProblems();
+            }
+        }
+    }
+
+    private void readSettings(
+        Path settingsDir) throws IOException, PlexusCipherException
+    {
+        Path settingsFile = settingsDir.resolve("settings.json");
+
+        RymSettings settings = new RymSettings();
+        settings.credentials = emptyList();
+
+        Jsonb builder = JsonbBuilder.newBuilder()
+                .withConfig(new JsonbConfig().withFormatting(true))
+                .build();
+
+        if (Files.exists(settingsFile))
+        {
+            try (InputStream in = newInputStream(settingsFile))
+            {
+                settings = builder.fromJson(in, RymSettings.class);
+            }
+        }
+
+        if (settings.credentials.size() > 0)
+        {
+            Path securityFile = settingsDir.resolve("security.json");
+
+            RymSecurity security = new RymSecurity();
+
+            if (Files.exists(securityFile))
+            {
+                try (InputStream in = newInputStream(securityFile))
+                {
+                    security = builder.fromJson(in, RymSecurity.class);
+                }
+            }
+
+            security.secret = decryptSecret(security.secret, SYSTEM_PROPERTY_SEC_LOCATION);
+
+            for (RymCredentials credentials : settings.credentials)
+            {
+                String realm = defaultRealmIfNecessary(credentials);
+                String host = credentials.host;
+                String username = credentials.username;
+                String password = RymSecrets.decryptSecret(credentials.password, security.secret);
+
+                CredentialsStore.INSTANCE.addCredentials(
+                    realm,
+                    host,
+                    username,
+                    password);
             }
         }
     }
@@ -573,10 +634,7 @@ public final class RymInstall extends RymCommand
             "--compress", "2",
             "--add-modules", moduleNames.collect(Collectors.joining(","))));
 
-        if (ignoreSigning)
-        {
-            args.add("--ignore-signing-information");
-        }
+        args.add("--ignore-signing-information");
 
         if (!debug)
         {
@@ -695,5 +753,17 @@ public final class RymInstall extends RymCommand
                  .map(Path::toFile)
                  .forEach(File::delete);
         }
+    }
+
+    private String defaultRealmIfNecessary(
+        RymCredentials credentials)
+    {
+        return ofNullable(credentials.realm)
+            .orElse(DEFAULT_REALMS.get(credentials.host));
+    }
+
+    private static Map<String, String> initDefaultRealms()
+    {
+        return singletonMap("maven.pkg.github.com", "GitHub Package Registry");
     }
 }
