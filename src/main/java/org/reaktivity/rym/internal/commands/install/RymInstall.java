@@ -659,7 +659,7 @@ public final class RymInstall extends RymCommand
                 "#!/bin/sh",
                 "cd \"${0%/*}\"",
                 String.format(String.join(" ", Arrays.asList(
-                    "%s/bin/java",
+                    "exec %s/bin/java",
                     "--add-opens java.base/sun.nio.ch=org.agrona.core",
                     "$JAVA_OPTIONS",
                     "-m org.reaktivity.ry/org.reaktivity.ry.internal.RyMain \"$@\"")),
