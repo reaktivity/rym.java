@@ -52,6 +52,7 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,6 +103,9 @@ public final class RymInstall extends RymCommand
 
     @Option(name = { "--exclude-local-repository" })
     public boolean excludeLocalRepo;
+
+    @Option(name = { "--ignore-missing-dependencies" })
+    public boolean ignoreMissingDependencies;
 
     @Override
     public void invoke()
@@ -529,12 +533,19 @@ public final class RymInstall extends RymCommand
             }
         }
 
+        List<String> jdepsArgs = Arrays.asList(
+            "--generate-module-info", generatedModulesDir.toString(),
+            generatedDelegatePath.toString());
+        if (ignoreMissingDependencies)
+        {
+            jdepsArgs = new LinkedList<>(jdepsArgs);
+            jdepsArgs.add(0, "--ignore-missing-deps");
+        }
         ToolProvider jdeps = ToolProvider.findFirst("jdeps").get();
         jdeps.run(
             System.out,
             System.err,
-            "--generate-module-info", generatedModulesDir.toString(),
-            generatedDelegatePath.toString());
+            jdepsArgs.toArray(String[]::new));
 
         Path generatedModuleInfo = generatedDelegateDir.resolve(MODULE_INFO_JAVA_FILENAME);
         assert Files.exists(generatedModuleInfo);
